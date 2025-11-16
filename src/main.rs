@@ -1,3 +1,79 @@
-fn main() {
-    println!("Hello, world!");
+mod client;
+mod models;
+mod routes;
+mod service;
+
+use actix_cors::Cors;
+use actix_web::{web, App, HttpServer};
+use client::{FetchClient, YahooAuthManager, YahooFinanceClient};
+use std::sync::Arc;
+use tracing::info;
+use tracing_actix_web::TracingLogger;
+
+pub struct AppState {
+    pub yahoo_auth_manager: Arc<YahooAuthManager>,
+    pub fetch_client: Arc<FetchClient>,
+    pub yahoo_client: Arc<YahooFinanceClient>,
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    // Initialize tracing
+    tracing_subscriber::fmt::init();
+
+    info!("Starting Finance Query Rust server...");
+
+    // Get proxy from environment (optional)
+    let proxy = std::env::var("PROXY_URL").ok();
+
+    // Initialize fetch client
+    let fetch_client = Arc::new(
+        FetchClient::new(proxy.clone())
+            .expect("Failed to create fetch client"),
+    );
+
+    // Initialize Yahoo auth manager
+    let yahoo_auth_manager = Arc::new(YahooAuthManager::new(proxy.clone()));
+
+    // Prime authentication on startup
+    info!("Priming Yahoo authentication...");
+    if let Err(e) = yahoo_auth_manager.refresh().await {
+        eprintln!("Warning: Failed to prime Yahoo authentication: {}", e);
+        eprintln!("Server will continue, but first request may be slower");
+    } else {
+        info!("Yahoo authentication primed successfully");
+    }
+
+    // Initialize Yahoo Finance client
+    let yahoo_client = Arc::new(YahooFinanceClient::new(
+        yahoo_auth_manager.clone(),
+        fetch_client.clone(),
+    ));
+
+    // Create app state
+    let app_state = web::Data::new(AppState {
+        yahoo_auth_manager,
+        fetch_client,
+        yahoo_client,
+    });
+
+    info!("Starting HTTP server on 0.0.0.0:8080");
+
+    HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .expose_any_header()
+            .max_age(3600);
+
+        App::new()
+            .app_data(app_state.clone())
+            .wrap(cors)
+            .wrap(TracingLogger::default())
+            .configure(routes::configure_routes)
+    })
+    .bind("0.0.0.0:8080")?
+    .run()
+    .await
 }
