@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 pub async fn get_earnings_calls_list(
-    yahoo_client: &YahooFinanceClient,
+    _yahoo_client: &YahooFinanceClient,
     fetch_client: &Arc<FetchClient>,
     symbol: &str,
 ) -> Result<Vec<Value>, YahooError> {

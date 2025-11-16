@@ -1,9 +1,7 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::client::YahooFinanceClient;
 use crate::models::{TimeRange, Interval};
 use crate::service;
 use serde::Deserialize;
-use std::str::FromStr;
 
 #[derive(Deserialize)]
 pub struct HistoricalQuery {
@@ -29,8 +27,7 @@ pub async fn get_historical_handler(
         time_range,
         interval,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(historical))
 }

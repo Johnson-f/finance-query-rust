@@ -1,6 +1,5 @@
 use actix_web::{web, HttpResponse, Result};
 use crate::service;
-use serde::Deserialize;
 
 pub async fn get_earnings_calls_handler(
     path: web::Path<String>,
@@ -13,8 +12,7 @@ pub async fn get_earnings_calls_handler(
         &app_state.fetch_client,
         &symbol,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(calls))
 }
@@ -23,7 +21,7 @@ pub async fn get_earnings_transcript_handler(
     path: web::Path<(String, String)>,
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
-    let (symbol, event_id) = path.into_inner();
+    let (_symbol, event_id) = path.into_inner();
     
     // First, we need to get the company_id (quartrId) for the symbol
     // This is a simplified version - you may need to fetch quote_type first
@@ -34,8 +32,7 @@ pub async fn get_earnings_transcript_handler(
         &event_id,
         company_id,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(transcript))
 }

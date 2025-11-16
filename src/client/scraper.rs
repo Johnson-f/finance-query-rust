@@ -111,7 +111,9 @@ pub async fn scrape_earnings_calls_list(
                         .and_then(|c| c.get(2))
                         .and_then(|m| m.as_str().parse::<i32>().ok());
 
-                    let title = if let (Some(q), Some(y)) = (quarter, year) {
+                    let quarter_clone = quarter.clone();
+                    let year_clone = year;
+                    let title = if let (Some(ref q), Some(y)) = (quarter, year) {
                         format!("{} {}", q, y)
                     } else {
                         "Earnings Call".to_string()
@@ -119,8 +121,8 @@ pub async fn scrape_earnings_calls_list(
 
                     calls.push(serde_json::json!({
                         "eventId": event_id,
-                        "quarter": quarter,
-                        "year": year,
+                        "quarter": quarter_clone,
+                        "year": year_clone,
                         "title": title,
                         "url": format!("https://finance.yahoo.com{}", href),
                     }));
@@ -131,4 +133,3 @@ pub async fn scrape_earnings_calls_list(
 
     Ok(calls)
 }
-

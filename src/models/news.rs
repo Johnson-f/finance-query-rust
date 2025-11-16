@@ -9,4 +9,3 @@ pub struct News {
     pub img: String,
     pub time: String,
 }
-

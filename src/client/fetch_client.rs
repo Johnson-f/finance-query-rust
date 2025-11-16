@@ -1,5 +1,5 @@
 use crate::client::error::YahooError;
-use reqwest::{cookie::Jar, Client, ClientBuilder, Url};
+use reqwest::{cookie::Jar, Client, ClientBuilder};
 use std::sync::Arc;
 use std::time::Duration;
 

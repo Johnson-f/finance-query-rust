@@ -27,11 +27,12 @@ fn parse_historical_data(data: Value) -> Result<HistoricalResponse, YahooError> 
                     if let Some(indicators) = result.get("indicators") {
                         if let Some(quote) = indicators.get("quote").and_then(|q| q.as_array()) {
                             if let Some(quote_data) = quote.first() {
-                                let opens = quote_data.get("open").and_then(|o| o.as_array()).unwrap_or(&vec![]);
-                                let highs = quote_data.get("high").and_then(|h| h.as_array()).unwrap_or(&vec![]);
-                                let lows = quote_data.get("low").and_then(|l| l.as_array()).unwrap_or(&vec![]);
-                                let closes = quote_data.get("close").and_then(|c| c.as_array()).unwrap_or(&vec![]);
-                                let volumes = quote_data.get("volume").and_then(|v| v.as_array()).unwrap_or(&vec![]);
+                                let empty_vec = vec![];
+                                let opens = quote_data.get("open").and_then(|o| o.as_array()).unwrap_or(&empty_vec);
+                                let highs = quote_data.get("high").and_then(|h| h.as_array()).unwrap_or(&empty_vec);
+                                let lows = quote_data.get("low").and_then(|l| l.as_array()).unwrap_or(&empty_vec);
+                                let closes = quote_data.get("close").and_then(|c| c.as_array()).unwrap_or(&empty_vec);
+                                let volumes = quote_data.get("volume").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
                                 let adj_closes = indicators
                                     .get("adjclose")

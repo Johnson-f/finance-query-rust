@@ -96,32 +96,32 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
             .to_string(),
         price: result.get("regularMarketPrice")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
             )
-            .unwrap_or("0.0")
-            .to_string(),
+            .unwrap_or_else(|| "0.0".to_string()),
         pre_market_price: result.get("preMarketPrice")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
-            )
-            .map(|s| s.to_string()),
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
+            ),
         after_hours_price: result.get("postMarketPrice")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
-            )
-            .map(|s| s.to_string()),
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
+            ),
         change: result.get("regularMarketChange")
             .and_then(|c| c.get("fmt").or_else(|| c.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
             )
-            .unwrap_or("0.0")
-            .to_string(),
+            .unwrap_or_else(|| "0.0".to_string()),
         percent_change: result.get("regularMarketChangePercent")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| format!("{:.2}%", f).as_str())))
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f))))
             )
-            .unwrap_or("0.0%")
-            .to_string(),
+            .unwrap_or_else(|| "0.0%".to_string()),
         open: None,
         high: None,
         low: None,
@@ -194,32 +194,32 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
             .to_string(),
         price: result.get("regularMarketPrice")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
             )
-            .unwrap_or("0.0")
-            .to_string(),
+            .unwrap_or_else(|| "0.0".to_string()),
         pre_market_price: result.get("preMarketPrice")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
-            )
-            .map(|s| s.to_string()),
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
+            ),
         after_hours_price: result.get("postMarketPrice")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
-            )
-            .map(|s| s.to_string()),
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
+            ),
         change: result.get("regularMarketChange")
             .and_then(|c| c.get("fmt").or_else(|| c.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| f.to_string().as_str())))
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string())))
             )
-            .unwrap_or("0.0")
-            .to_string(),
+            .unwrap_or_else(|| "0.0".to_string()),
         percent_change: result.get("regularMarketChangePercent")
             .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().or_else(|| v.as_f64().map(|f| format!("{:.2}%", f).as_str())))
+                .and_then(|v| v.as_str().map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f))))
             )
-            .unwrap_or("0.0%")
-            .to_string(),
+            .unwrap_or_else(|| "0.0%".to_string()),
         logo: None,
     })
 }

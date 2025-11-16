@@ -1,9 +1,6 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::client::{FetchClient, YahooFinanceClient};
-use crate::models::{Quote, SimpleQuote};
 use crate::service;
 use serde::Deserialize;
-use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct QuotesQuery {
@@ -21,8 +18,7 @@ pub async fn get_quotes_handler(
         &app_state.fetch_client,
         &symbols,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(quotes))
 }
@@ -38,8 +34,7 @@ pub async fn get_simple_quotes_handler(
         &app_state.fetch_client,
         &symbols,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(quotes))
 }

@@ -1,7 +1,6 @@
 use crate::client::error::YahooError;
 use crate::client::yahoo_auth::YahooAuthManager;
 use crate::client::FetchClient;
-use reqwest::cookie::Jar;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -23,7 +22,7 @@ impl YahooFinanceClient {
         url: &str,
         params: Option<&[(&str, &str)]>,
     ) -> Result<reqwest::Response, YahooError> {
-        let (cookie_jar, crumb) = self.auth_manager.get_or_refresh().await?;
+        let (_cookie_jar, crumb) = self.auth_manager.get_or_refresh().await?;
 
         let mut request = self
             .fetch_client
@@ -123,7 +122,8 @@ impl YahooFinanceClient {
             "https://query2.finance.yahoo.com/v6/finance/recommendationsbysymbol/{}",
             symbol
         );
-        let params = [("count", &limit.to_string())];
+        let count_str = limit.to_string();
+        let params = [("count", count_str.as_str())];
         self.json(&url, Some(&params)).await
     }
 
@@ -139,12 +139,14 @@ impl YahooFinanceClient {
             symbol
         );
         let types_str = types.join(",");
+        let period1_str = period1.to_string();
+        let period2_str = period2.to_string();
         let params = [
             ("merge", "false"),
             ("padTimeSeries", "true"),
-            ("period1", &period1.to_string()),
-            ("period2", &period2.to_string()),
-            ("type", &types_str),
+            ("period1", period1_str.as_str()),
+            ("period2", period2_str.as_str()),
+            ("type", types_str.as_str()),
             ("lang", "en-US"),
             ("region", "US"),
         ];
@@ -162,7 +164,7 @@ impl YahooFinanceClient {
         );
         let modules_str = modules.join(",");
         let params = [
-            ("modules", &modules_str),
+            ("modules", modules_str.as_str()),
             ("corsDomain", "finance.yahoo.com"),
             ("formatted", "false"),
         ];
@@ -190,4 +192,3 @@ impl YahooFinanceClient {
         self.json(url, Some(&params)).await
     }
 }
-

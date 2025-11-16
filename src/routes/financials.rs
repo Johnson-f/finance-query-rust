@@ -1,5 +1,4 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::client::YahooFinanceClient;
 use crate::models::{StatementType, Frequency};
 use crate::service;
 use serde::Deserialize;
@@ -28,8 +27,7 @@ pub async fn get_financials_handler(
         statement_type,
         frequency,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(financials))
 }

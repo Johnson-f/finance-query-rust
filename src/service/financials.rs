@@ -1,7 +1,6 @@
 use crate::client::YahooFinanceClient;
 use crate::client::error::YahooError;
 use crate::models::{FinancialStatement, StatementType, Frequency};
-use serde_json::Value;
 
 pub async fn get_financial_statement(
     yahoo_client: &YahooFinanceClient,

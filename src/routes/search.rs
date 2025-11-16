@@ -1,5 +1,4 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::client::YahooFinanceClient;
 use crate::service;
 use serde::Deserialize;
 
@@ -23,8 +22,7 @@ pub async fn search_handler(
         &query.q,
         query.hits,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(results))
 }

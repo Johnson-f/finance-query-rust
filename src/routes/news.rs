@@ -11,8 +11,7 @@ pub async fn get_news_for_symbol_handler(
         &app_state.fetch_client,
         &symbol,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(news))
 }
@@ -23,9 +22,7 @@ pub async fn get_general_news_handler(
     let news = service::scrape_general_news(
         &app_state.fetch_client,
     )
-    .await
-    .map_err(|e| e.error_response())?;
+    .await?;
 
     Ok(HttpResponse::Ok().json(news))
 }
-

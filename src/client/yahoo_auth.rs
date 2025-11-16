@@ -1,6 +1,6 @@
 use crate::client::error::YahooError;
 use chrono::{DateTime, Utc};
-use reqwest::{cookie::Jar, Client, ClientBuilder, Url};
+use reqwest::{cookie::Jar, Client, ClientBuilder};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -70,9 +70,6 @@ impl YahooAuthManager {
 
         // Extract cookies from client
         let cookie_jar = Arc::new(Jar::default());
-        let base_url = Url::parse("https://finance.yahoo.com").map_err(|e| {
-            YahooError::ParseError(format!("Failed to parse base URL: {}", e))
-        })?;
 
         // Note: reqwest doesn't expose cookies directly, so we'll rely on the client's cookie store
         // For now, we'll create a new jar and let the client handle cookies

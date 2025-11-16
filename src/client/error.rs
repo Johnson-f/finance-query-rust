@@ -1,5 +1,4 @@
 use actix_web::{HttpResponse, ResponseError};
-use std::fmt;
 
 #[derive(Debug, thiserror::Error)]
 pub enum YahooError {
