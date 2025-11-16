@@ -32,8 +32,11 @@ async fn main() -> std::io::Result<()> {
             .expect("Failed to create fetch client"),
     );
 
-    // Initialize Yahoo auth manager
-    let yahoo_auth_manager = Arc::new(YahooAuthManager::new(proxy.clone()));
+    // Initialize Yahoo auth manager with shared cookie jar from fetch client
+    let yahoo_auth_manager = Arc::new(YahooAuthManager::new(
+        proxy.clone(),
+        fetch_client.cookie_jar().clone(),
+    ));
 
     // Prime authentication on startup
     info!("Priming Yahoo authentication...");

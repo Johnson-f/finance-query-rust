@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use reqwest::{cookie::Jar, Client, ClientBuilder};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tracing::{debug, error, info, warn};
 
 const MIN_REFRESH_INTERVAL_SECS: i64 = 30;
 
@@ -18,8 +19,7 @@ pub struct YahooAuthManager {
 }
 
 impl YahooAuthManager {
-    pub fn new(proxy: Option<String>) -> Self {
-        let cookie_jar = Arc::new(Jar::default());
+    pub fn new(proxy: Option<String>, cookie_jar: Arc<Jar>) -> Self {
         Self {
             state: Arc::new(Mutex::new(AuthState {
                 crumb: None,
@@ -31,7 +31,15 @@ impl YahooAuthManager {
     }
 
     pub async fn refresh(&self) -> Result<(), YahooError> {
-        let mut builder = ClientBuilder::new().timeout(Duration::from_secs(10));
+        info!("Refreshing Yahoo authentication...");
+        let state = self.state.lock().unwrap();
+        let cookie_jar = state.cookie_jar.clone();
+        drop(state);
+
+        let mut builder = ClientBuilder::new()
+            .timeout(Duration::from_secs(30))
+            .cookie_provider(cookie_jar.clone())
+            .redirect(reqwest::redirect::Policy::limited(10));
 
         if let Some(proxy_url) = &self.proxy {
             builder = builder.proxy(reqwest::Proxy::all(proxy_url).map_err(|e| {
@@ -41,119 +49,99 @@ impl YahooAuthManager {
 
         let client = builder.build().map_err(YahooError::NetworkError)?;
 
-        // Step 1: Visit fc.yahoo.com to get initial cookies
+        // Step 1: Visit Yahoo Finance homepage to establish session
+        info!("Step 1: Visiting Yahoo Finance homepage");
         let _ = client
-            .get("https://fc.yahoo.com")
+            .get("https://finance.yahoo.com/")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            )
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Accept-Encoding", "gzip, deflate, br")
+            .header("Connection", "keep-alive")
+            .header("Upgrade-Insecure-Requests", "1")
+            .send()
+            .await
+            .map_err(YahooError::NetworkError)?;
+        
+        debug!("Finance homepage visited");
+
+        // Step 2: Visit a quote page to get more cookies
+        info!("Step 2: Visiting quote page");
+        let _ = client
+            .get("https://finance.yahoo.com/quote/AAPL")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            )
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Referer", "https://finance.yahoo.com/")
             .send()
             .await
             .map_err(YahooError::NetworkError)?;
 
-        // Step 2: Try to get crumb
+        debug!("Quote page visited");
+
+        // Step 3: Try to get crumb from query1
+        info!("Step 3: Attempting to get crumb from query1 endpoint");
         let crumb_response = client
             .get("https://query1.finance.yahoo.com/v1/test/getcrumb")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            )
+            .header("Accept", "*/*")
+            .header("Referer", "https://finance.yahoo.com/")
             .send()
             .await
             .map_err(YahooError::NetworkError)?;
 
+        let status = crumb_response.status();
+        debug!("getcrumb response status: {}", status);
+        
         let crumb_text = crumb_response.text().await.map_err(YahooError::NetworkError)?;
         let crumb = crumb_text.trim().to_string();
+        debug!("Crumb received (length: {}): {}", crumb.len(), 
+            if crumb.len() < 50 { &crumb } else { "..." });
 
-        // If crumb is invalid (contains HTML), use CSRF fallback
-        if crumb.is_empty() || crumb.contains("<html") {
-            return self.refresh_with_csrf(client).await;
+        // If crumb is invalid (contains HTML or is empty), try alternative method
+        if crumb.is_empty() || crumb.contains("<html") || crumb.contains("Unauthorized") {
+            warn!("Crumb from query1 is invalid, trying query2");
+            
+            let crumb_response2 = client
+                .get("https://query2.finance.yahoo.com/v1/test/getcrumb")
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                )
+                .header("Accept", "*/*")
+                .header("Referer", "https://finance.yahoo.com/")
+                .send()
+                .await
+                .map_err(YahooError::NetworkError)?;
+
+            let crumb_text2 = crumb_response2.text().await.map_err(YahooError::NetworkError)?;
+            let crumb2 = crumb_text2.trim().to_string();
+            
+            if crumb2.is_empty() || crumb2.contains("<html") || crumb2.contains("Unauthorized") {
+                error!("Failed to get valid crumb from both endpoints");
+                return Err(YahooError::AuthFailed(
+                    "Could not obtain valid crumb from Yahoo".to_string(),
+                ));
+            }
+            
+            info!("Successfully obtained crumb from query2 (length: {})", crumb2.len());
+            let mut state = self.state.lock().unwrap();
+            state.crumb = Some(crumb2);
+            state.last_update = Some(Utc::now());
+            return Ok(());
         }
 
-        // Successfully obtained crumb
-        let mut state = self.state.lock().unwrap();
-        state.crumb = Some(crumb);
-        state.last_update = Some(Utc::now());
-
-        // Extract cookies from client
-        let cookie_jar = Arc::new(Jar::default());
-
-        // Note: reqwest doesn't expose cookies directly, so we'll rely on the client's cookie store
-        // For now, we'll create a new jar and let the client handle cookies
-        state.cookie_jar = cookie_jar;
-
-        Ok(())
-    }
-
-    async fn refresh_with_csrf(&self, client: Client) -> Result<(), YahooError> {
-        // Get consent page
-        let consent_response = client
-            .get("https://guce.yahoo.com/consent")
-            .send()
-            .await
-            .map_err(YahooError::NetworkError)?;
-
-        let consent_html = consent_response.text().await.map_err(YahooError::NetworkError)?;
-
-        // Extract CSRF token and session ID using regex
-        let csrf_regex = regex::Regex::new(r#"name="csrfToken"[^>]*value="([^"]+)""#)
-            .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
-        let session_regex = regex::Regex::new(r#"name="sessionId"[^>]*value="([^"]+)""#)
-            .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
-
-        let csrf_token = csrf_regex
-            .captures(&consent_html)
-            .and_then(|c| c.get(1))
-            .map(|m| m.as_str().to_string())
-            .ok_or_else(|| YahooError::AuthFailed("Failed to extract CSRF token".to_string()))?;
-
-        let session_id = session_regex
-            .captures(&consent_html)
-            .and_then(|c| c.get(1))
-            .map(|m| m.as_str().to_string())
-            .ok_or_else(|| YahooError::AuthFailed("Failed to extract session ID".to_string()))?;
-
-        // Submit consent form
-        let consent_data = [
-            ("agree", "agree"),
-            ("agree", "agree"),
-            ("consentUUID", "default"),
-            ("sessionId", &session_id),
-            ("csrfToken", &csrf_token),
-            ("originalDoneUrl", "https://finance.yahoo.com/"),
-            ("namespace", "yahoo"),
-        ];
-
-        let _ = client
-            .post(format!(
-                "https://consent.yahoo.com/v2/collectConsent?sessionId={}",
-                session_id
-            ))
-            .form(&consent_data)
-            .send()
-            .await
-            .map_err(YahooError::NetworkError)?;
-
-        // Copy consent
-        let _ = client
-            .get(format!(
-                "https://guce.yahoo.com/copyConsent?sessionId={}",
-                session_id
-            ))
-            .send()
-            .await
-            .map_err(YahooError::NetworkError)?;
-
-        // Get crumb from alternative endpoint
-        let crumb_response = client
-            .get("https://query2.finance.yahoo.com/v1/test/getcrumb")
-            .send()
-            .await
-            .map_err(YahooError::NetworkError)?;
-
-        let crumb_text = crumb_response.text().await.map_err(YahooError::NetworkError)?;
-        let crumb = crumb_text.trim().to_string();
-
-        if crumb.is_empty() || crumb.contains("<html") {
-            return Err(YahooError::AuthFailed(
-                "Yahoo returned an invalid crumb".to_string(),
-            ));
-        }
-
-        // Successfully obtained crumb
+        // Successfully obtained crumb from query1
+        info!("Successfully obtained crumb (length: {})", crumb.len());
         let mut state = self.state.lock().unwrap();
         state.crumb = Some(crumb);
         state.last_update = Some(Utc::now());
@@ -169,16 +157,26 @@ impl YahooAuthManager {
             || (Utc::now() - state.last_update.unwrap()).num_seconds() > MIN_REFRESH_INTERVAL_SECS;
 
         if needs_refresh {
+            debug!("Auth refresh needed. Crumb exists: {}, Last update: {:?}", 
+                state.crumb.is_some(), 
+                state.last_update);
             drop(state); // Release lock before async operation
             self.refresh().await?;
             state = self.state.lock().unwrap();
+        } else {
+            debug!("Using cached crumb (age: {}s)", 
+                state.last_update.map(|t| (Utc::now() - t).num_seconds()).unwrap_or(0));
         }
 
         let crumb = state
             .crumb
             .clone()
-            .ok_or_else(|| YahooError::AuthFailed("No crumb available".to_string()))?;
+            .ok_or_else(|| {
+                error!("No crumb available after refresh attempt");
+                YahooError::AuthFailed("No crumb available".to_string())
+            })?;
 
+        debug!("Returning crumb (length: {})", crumb.len());
         Ok((state.cookie_jar.clone(), crumb))
     }
 
@@ -186,4 +184,3 @@ impl YahooAuthManager {
         self.state.lock().unwrap().crumb.clone()
     }
 }
-
