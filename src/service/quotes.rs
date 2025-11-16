@@ -12,49 +12,37 @@ pub async fn get_quotes(
 ) -> Result<Vec<Quote>, YahooError> {
     info!("Fetching quotes for symbols: {:?}", symbols);
     
-    // Try API first
-    match yahoo_client.get_simple_quotes(symbols).await {
-        Ok(data) => {
-            debug!("Received API response: {}", serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string()));
-            
-            // Log the structure to understand what we're getting
-            if let Some(quote_response) = data.get("quoteResponse") {
-                debug!("Found quoteResponse in data");
-                if let Some(results) = quote_response.get("result") {
-                    if let Some(results_array) = results.as_array() {
-                        info!("Found {} results in quoteResponse.result", results_array.len());
-                        for (idx, result) in results_array.iter().enumerate() {
-                            debug!("Result {}: symbol={:?}, price keys={:?}", 
-                                idx,
-                                result.get("symbol"),
-                                result.get("regularMarketPrice").map(|p| p.as_object().map(|o| o.keys().collect::<Vec<_>>()))
-                            );
-                        }
-                    } else {
-                        warn!("quoteResponse.result is not an array: {:?}", results);
+    // Fetch detailed quotes using quoteSummary endpoint for each symbol
+    let mut quotes = Vec::new();
+    for symbol in symbols {
+        match yahoo_client.get_quote(symbol).await {
+            Ok(data) => {
+                debug!("Received quoteSummary response for {}: {}", symbol, serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string()));
+                
+                // Parse quoteSummary format
+                match parse_quote_from_summary(data) {
+                    Ok(quote) => {
+                        info!("Successfully parsed detailed quote for {}", symbol);
+                        quotes.push(quote);
                     }
-                } else {
-                    warn!("No 'result' field in quoteResponse");
+                    Err(e) => {
+                        error!("Failed to parse quoteSummary for {}: {}", symbol, e);
+                        // Try fallback to scraping
+                        warn!("Falling back to scraping for {}", symbol);
+                        if let Ok(quote_data) = scraper::scrape_quote(fetch_client, symbol).await {
+                            if let Ok(quote) = parse_quote_from_scraped(quote_data) {
+                                quotes.push(quote);
+                            }
+                        }
+                    }
                 }
-            } else {
-                warn!("No 'quoteResponse' field in API response. Top-level keys: {:?}", 
-                    data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
             }
-            
-            // Parse the response
-            let quotes = parse_quotes_from_api(data)?;
-            info!("Successfully parsed {} quotes from API", quotes.len());
-            Ok(quotes)
-        }
-        Err(e) => {
-            warn!("API call failed: {}. Falling back to scraping", e);
-            // Fallback to scraping
-            let mut quotes = Vec::new();
-            for symbol in symbols {
+            Err(e) => {
+                warn!("API call failed for {}: {}. Falling back to scraping", symbol, e);
+                // Fallback to scraping
                 match scraper::scrape_quote(fetch_client, symbol).await {
                     Ok(quote_data) => {
                         debug!("Scraped quote data for {}: {:?}", symbol, quote_data);
-                        // Convert scraped data to Quote
                         if let Ok(quote) = parse_quote_from_scraped(quote_data) {
                             info!("Successfully parsed scraped quote for {}", symbol);
                             quotes.push(quote);
@@ -67,10 +55,11 @@ pub async fn get_quotes(
                     }
                 }
             }
-            info!("Returning {} quotes from scraping fallback", quotes.len());
-            Ok(quotes)
         }
     }
+    
+    info!("Returning {} quotes", quotes.len());
+    Ok(quotes)
 }
 
 pub async fn get_simple_quotes(
@@ -130,6 +119,227 @@ pub async fn get_simple_quotes(
             Ok(quotes)
         }
     }
+}
+
+// Helper function to extract formatted value from Yahoo API response
+fn get_fmt(data: &Value, key: &str) -> Option<String> {
+    data.get(key)
+        .and_then(|v| {
+            if let Some(obj) = v.as_object() {
+                obj.get("fmt")
+                    .or_else(|| obj.get("raw"))
+                    .and_then(|val| {
+                        val.as_str().map(|s| s.to_string())
+                            .or_else(|| val.as_f64().map(|f| f.to_string()))
+                    })
+            } else if let Some(num) = v.as_f64() {
+                Some(num.to_string())
+            } else if let Some(str_val) = v.as_str() {
+                Some(str_val.to_string())
+            } else {
+                None
+            }
+        })
+}
+
+// Helper function to extract raw numeric value
+fn get_raw(data: &Value, key: &str) -> Option<i64> {
+    data.get(key)
+        .and_then(|v| {
+            if let Some(obj) = v.as_object() {
+                obj.get("raw").and_then(|r| r.as_i64())
+            } else {
+                v.as_i64()
+            }
+        })
+}
+
+// Helper function to format date
+fn format_date(date_val: Option<&Value>) -> Option<String> {
+    date_val.and_then(|d| {
+        if let Some(str_val) = d.as_str() {
+            Some(str_val.to_string())
+        } else if let Some(num) = d.as_i64() {
+            // Convert epoch timestamp to date string if needed
+            Some(num.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn parse_quote_from_summary(data: Value) -> Result<Quote, YahooError> {
+    let summary_result = data
+        .get("quoteSummary")
+        .and_then(|qs| qs.get("result"))
+        .and_then(|r| r.as_array())
+        .and_then(|arr| arr.get(0))
+        .ok_or_else(|| YahooError::ParseError("No quoteSummary result found".to_string()))?;
+    
+    let price_data = summary_result.get("price").unwrap_or(&Value::Null);
+    let summary_detail = summary_result.get("summaryDetail").unwrap_or(&Value::Null);
+    let stats = summary_result.get("defaultKeyStatistics").unwrap_or(&Value::Null);
+    let profile = summary_result.get("assetProfile").unwrap_or(&Value::Null);
+    let calendar = summary_result.get("calendarEvents").unwrap_or(&Value::Null);
+    let performance_overview = summary_result
+        .get("quoteUnadjustedPerformanceOverview")
+        .and_then(|q| q.get("performanceOverview"))
+        .unwrap_or(&Value::Null);
+    
+    // Parse earnings dates
+    let earnings_date = calendar
+        .get("earnings")
+        .and_then(|e| e.get("earningsDate"))
+        .and_then(|ed| ed.as_array())
+        .map(|dates| {
+            dates
+                .iter()
+                .filter_map(|d| get_fmt(d, "fmt"))
+                .collect::<Vec<_>>()
+                .join(" - ")
+        })
+        .filter(|s| !s.is_empty());
+    
+    // Parse ex-dividend date
+    let ex_dividend = calendar
+        .get("exDividendDate")
+        .and_then(|d| get_fmt(d, "fmt"));
+    
+    // Parse inception date
+    let inception_date = stats
+        .get("fundInceptionDate")
+        .and_then(|d| {
+            if let Some(raw) = d.get("raw").and_then(|r| r.as_i64()) {
+                // Convert epoch to date string if needed
+                Some(raw.to_string())
+            } else {
+                get_fmt(d, "fmt")
+            }
+        });
+    
+    // Parse morningstar rating
+    let morningstar_rating = stats
+        .get("morningStarOverallRating")
+        .and_then(|r| r.get("raw").and_then(|raw| raw.as_i64()))
+        .map(|rating| {
+            if rating > 0 {
+                "★".repeat(rating as usize)
+            } else {
+                String::new()
+            }
+        })
+        .filter(|s| !s.is_empty());
+    
+    // Parse morningstar risk rating
+    let morningstar_risk_rating = stats
+        .get("morningStarRiskRating")
+        .and_then(|r| r.get("raw").and_then(|raw| raw.as_i64()))
+        .map(|risk| {
+            match risk {
+                1 => "Low",
+                2 => "Below Average",
+                3 => "Average",
+                4 => "Above Average",
+                5 => "High",
+                _ => "Unknown",
+            }
+            .to_string()
+        });
+    
+    // Parse employees
+    let employees = profile
+        .get("fullTimeEmployees")
+        .and_then(|e| e.as_i64())
+        .map(|e| e.to_string());
+    
+    Ok(Quote {
+        symbol: price_data
+            .get("symbol")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
+        name: price_data
+            .get("longName")
+            .or_else(|| price_data.get("shortName"))
+            .and_then(|n| n.as_str())
+            .unwrap_or("")
+            .to_string(),
+        price: get_fmt(price_data, "regularMarketPrice")
+            .unwrap_or_else(|| "0.0".to_string()),
+        pre_market_price: price_data
+            .get("preMarketTime")
+            .and_then(|t| t.as_i64())
+            .filter(|&time| time > 0)
+            .and_then(|_| get_fmt(price_data, "preMarketPrice")),
+        after_hours_price: price_data
+            .get("postMarketTime")
+            .and_then(|t| t.as_i64())
+            .filter(|&time| time > 0)
+            .and_then(|_| get_fmt(price_data, "postMarketPrice")),
+        change: get_fmt(price_data, "regularMarketChange")
+            .unwrap_or_else(|| "0.0".to_string()),
+        percent_change: get_fmt(price_data, "regularMarketChangePercent")
+            .unwrap_or_else(|| "0.0%".to_string()),
+        open: get_fmt(summary_detail, "open"),
+        high: get_fmt(summary_detail, "dayHigh"),
+        low: get_fmt(summary_detail, "dayLow"),
+        year_high: get_fmt(summary_detail, "fiftyTwoWeekHigh"),
+        year_low: get_fmt(summary_detail, "fiftyTwoWeekLow"),
+        volume: get_raw(summary_detail, "volume"),
+        avg_volume: get_raw(summary_detail, "averageVolume"),
+        market_cap: get_fmt(summary_detail, "marketCap"),
+        beta: get_fmt(summary_detail, "beta"),
+        pe: get_fmt(summary_detail, "trailingPE"),
+        eps: get_fmt(summary_detail, "trailingEps"),
+        dividend: get_fmt(summary_detail, "dividendRate"),
+        dividend_yield: get_fmt(summary_detail, "dividendYield"),
+        ex_dividend,
+        net_assets: get_fmt(summary_detail, "totalAssets"),
+        nav: get_fmt(summary_detail, "navPrice"),
+        expense_ratio: stats
+            .get("annualReportExpenseRatio")
+            .and_then(|r| {
+                if let Some(raw) = r.get("raw").and_then(|raw| raw.as_f64()) {
+                    Some(format!("{:.2}%", raw * 100.0))
+                } else {
+                    get_fmt(r, "raw").map(|r| format!("{:.2}%", r.parse::<f64>().unwrap_or(0.0) * 100.0))
+                }
+            }),
+        category: stats.get("category").and_then(|c| c.as_str()).map(|s| s.to_string()),
+        last_capital_gain: get_fmt(stats, "lastCapGain"),
+        morningstar_rating,
+        morningstar_risk_rating,
+        holdings_turnover: stats
+            .get("annualHoldingsTurnover")
+            .and_then(|t| {
+                if let Some(raw) = t.get("raw").and_then(|raw| raw.as_f64()) {
+                    Some(format!("{:.2}%", raw * 100.0))
+                } else {
+                    get_fmt(t, "raw").map(|t| format!("{:.2}%", t.parse::<f64>().unwrap_or(0.0) * 100.0))
+                }
+            }),
+        earnings_date,
+        last_dividend: get_fmt(stats, "lastDividendValue"),
+        inception_date,
+        sector: profile.get("sector").and_then(|s| s.as_str()).map(|s| s.to_string()),
+        industry: profile.get("industry").and_then(|i| i.as_str()).map(|s| s.to_string()),
+        about: profile
+            .get("longBusinessSummary")
+            .and_then(|a| a.as_str())
+            .map(|s| s.to_string()),
+        employees,
+        five_days_return: get_fmt(performance_overview, "fiveDaysReturn"),
+        one_month_return: get_fmt(performance_overview, "oneMonthReturn"),
+        three_month_return: get_fmt(performance_overview, "threeMonthReturn"),
+        six_month_return: get_fmt(performance_overview, "sixMonthReturn"),
+        ytd_return: get_fmt(performance_overview, "ytdReturnPct"),
+        year_return: get_fmt(performance_overview, "oneYearTotalReturn"),
+        three_year_return: get_fmt(performance_overview, "threeYearTotalReturn"),
+        five_year_return: get_fmt(performance_overview, "fiveYearTotalReturn"),
+        ten_year_return: get_fmt(performance_overview, "tenYearTotalReturn"),
+        max_return: get_fmt(performance_overview, "maxReturn"),
+        logo: None, // Logo will be added separately if needed
+    })
 }
 
 fn parse_quotes_from_api(data: Value) -> Result<Vec<Quote>, YahooError> {
@@ -535,4 +745,42 @@ fn parse_simple_quote_from_scraped(data: Value) -> Result<SimpleQuote, YahooErro
             .unwrap_or_else(|| "0.0%".to_string()),
         logo: None,
     })
+}
+
+pub async fn get_similar_quotes(
+    yahoo_client: &YahooFinanceClient,
+    fetch_client: &Arc<crate::client::FetchClient>,
+    symbol: &str,
+    limit: usize,
+) -> Result<Vec<SimpleQuote>, YahooError> {
+    info!("Fetching similar quotes for symbol: {} (limit: {})", symbol, limit);
+    
+    // Get similar symbols from Yahoo API
+    let similar_data = yahoo_client.get_similar_quotes(symbol, limit).await?;
+    
+    // Extract symbols from the response
+    let symbols: Vec<&str> = similar_data
+        .get("finance")
+        .and_then(|f| f.get("result"))
+        .and_then(|r| r.as_array())
+        .and_then(|arr| arr.get(0))
+        .and_then(|first| first.get("recommendedSymbols"))
+        .and_then(|recs| recs.as_array())
+        .map(|recs| {
+            recs.iter()
+                .filter_map(|rec| rec.get("symbol").and_then(|s| s.as_str()))
+                .take(limit)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    
+    if symbols.is_empty() {
+        warn!("No similar symbols found for {}", symbol);
+        return Ok(Vec::new());
+    }
+    
+    info!("Found {} similar symbols: {:?}", symbols.len(), symbols);
+    
+    // Fetch simple quotes for the similar symbols
+    get_simple_quotes(yahoo_client, fetch_client, &symbols).await
 }

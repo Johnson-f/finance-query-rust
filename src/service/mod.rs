@@ -5,7 +5,7 @@ pub mod financials;
 pub mod news;
 pub mod earnings;
 
-pub use quotes::{get_quotes, get_simple_quotes};
+pub use quotes::{get_quotes, get_simple_quotes, get_similar_quotes};
 pub use historical::get_historical;
 pub use search::search;
 pub use financials::get_financial_statement;

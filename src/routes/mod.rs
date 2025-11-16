@@ -5,6 +5,7 @@ pub mod news;
 pub mod financials;
 pub mod earnings;
 pub mod health;
+pub mod similar;
 
 use actix_web::web;
 
@@ -12,7 +13,9 @@ pub fn configure_routes(cfg: &mut actix_web::web::ServiceConfig) {
     cfg.service(
         web::scope("/v1")
             .route("/quotes", web::get().to(quotes::get_quotes_handler))
-            .route("/quotes/simple", web::get().to(quotes::get_simple_quotes_handler))
+            .route("/simple-quotes", web::get().to(quotes::get_simple_quotes_handler))
+            .route("/detailed-quotes", web::get().to(quotes::get_detailed_quotes_handler))
+            .route("/similar", web::get().to(similar::get_similar_quotes_handler))
             .route("/historical/{symbol}", web::get().to(historical::get_historical_handler))
             .route("/search", web::get().to(search::search_handler))
             .route("/news/{symbol}", web::get().to(news::get_news_for_symbol_handler))
