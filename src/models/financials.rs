@@ -39,12 +39,15 @@ impl Frequency {
     }
 }
 
+use std::collections::HashMap;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct FinancialStatement {
     pub symbol: String,
     pub statement_type: String,
     pub frequency: String,
-    pub data: serde_json::Value,
+    #[serde(rename = "statement")]
+    pub statement: HashMap<String, HashMap<String, serde_json::Value>>,
 }
 

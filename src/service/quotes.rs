@@ -1,6 +1,7 @@
 use crate::client::{scraper, YahooFinanceClient};
 use crate::client::error::YahooError;
 use crate::models::{Quote, SimpleQuote};
+use crate::service::logo;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
@@ -20,7 +21,7 @@ pub async fn get_quotes(
                 debug!("Received quoteSummary response for {}: {}", symbol, serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string()));
                 
                 // Parse quoteSummary format
-                match parse_quote_from_summary(data) {
+                match parse_quote_from_summary(data, fetch_client, symbol).await {
                     Ok(quote) => {
                         info!("Successfully parsed detailed quote for {}", symbol);
                         quotes.push(quote);
@@ -30,7 +31,9 @@ pub async fn get_quotes(
                         // Try fallback to scraping
                         warn!("Falling back to scraping for {}", symbol);
                         if let Ok(quote_data) = scraper::scrape_quote(fetch_client, symbol).await {
-                            if let Ok(quote) = parse_quote_from_scraped(quote_data) {
+                            if let Ok(mut quote) = parse_quote_from_scraped(quote_data) {
+                                // Fetch logo for scraped quote
+                                quote.logo = logo::get_logo(fetch_client, Some(symbol), None).await;
                                 quotes.push(quote);
                             }
                         }
@@ -43,8 +46,10 @@ pub async fn get_quotes(
                 match scraper::scrape_quote(fetch_client, symbol).await {
                     Ok(quote_data) => {
                         debug!("Scraped quote data for {}: {:?}", symbol, quote_data);
-                        if let Ok(quote) = parse_quote_from_scraped(quote_data) {
+                        if let Ok(mut quote) = parse_quote_from_scraped(quote_data) {
                             info!("Successfully parsed scraped quote for {}", symbol);
+                            // Fetch logo for scraped quote
+                            quote.logo = logo::get_logo(fetch_client, Some(symbol), None).await;
                             quotes.push(quote);
                         } else {
                             error!("Failed to parse scraped quote data for {}", symbol);
@@ -91,7 +96,12 @@ pub async fn get_simple_quotes(
                     data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
             }
             
-            let quotes = parse_simple_quotes_from_api(data)?;
+            let mut quotes = parse_simple_quotes_from_api(data)?;
+            // Fetch logos for all quotes
+            for quote in &mut quotes {
+                let symbol = quote.symbol.clone();
+                quote.logo = logo::get_logo(fetch_client, Some(&symbol), None).await;
+            }
             info!("Successfully parsed {} simple quotes from API", quotes.len());
             Ok(quotes)
         }
@@ -103,8 +113,10 @@ pub async fn get_simple_quotes(
                 match scraper::scrape_simple_quote(fetch_client, symbol).await {
                     Ok(quote_data) => {
                         debug!("Scraped simple quote data for {}: {:?}", symbol, quote_data);
-                        if let Ok(quote) = parse_simple_quote_from_scraped(quote_data) {
+                        if let Ok(mut quote) = parse_simple_quote_from_scraped(quote_data) {
                             info!("Successfully parsed scraped simple quote for {}", symbol);
+                            // Fetch logo for scraped simple quote
+                            quote.logo = logo::get_logo(fetch_client, Some(symbol), None).await;
                             quotes.push(quote);
                         } else {
                             error!("Failed to parse scraped simple quote data for {}", symbol);
@@ -168,7 +180,11 @@ fn format_date(date_val: Option<&Value>) -> Option<String> {
     })
 }
 
-fn parse_quote_from_summary(data: Value) -> Result<Quote, YahooError> {
+async fn parse_quote_from_summary(
+    data: Value,
+    fetch_client: &Arc<crate::client::FetchClient>,
+    symbol: &str,
+) -> Result<Quote, YahooError> {
     let summary_result = data
         .get("quoteSummary")
         .and_then(|qs| qs.get("result"))
@@ -185,6 +201,9 @@ fn parse_quote_from_summary(data: Value) -> Result<Quote, YahooError> {
         .get("quoteUnadjustedPerformanceOverview")
         .and_then(|q| q.get("performanceOverview"))
         .unwrap_or(&Value::Null);
+    
+    // Extract website URL for logo fetching
+    let website_url = profile.get("website").and_then(|w| w.as_str());
     
     // Parse earnings dates
     let earnings_date = calendar
@@ -338,7 +357,7 @@ fn parse_quote_from_summary(data: Value) -> Result<Quote, YahooError> {
         five_year_return: get_fmt(performance_overview, "fiveYearTotalReturn"),
         ten_year_return: get_fmt(performance_overview, "tenYearTotalReturn"),
         max_return: get_fmt(performance_overview, "maxReturn"),
-        logo: None, // Logo will be added separately if needed
+        logo: logo::get_logo(fetch_client, Some(symbol), website_url).await,
     })
 }
 

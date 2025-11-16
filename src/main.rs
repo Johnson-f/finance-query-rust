@@ -2,6 +2,7 @@ mod client;
 mod models;
 mod routes;
 mod service;
+mod utils;
 
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
