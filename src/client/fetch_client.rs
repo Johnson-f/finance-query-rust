@@ -45,9 +45,17 @@ impl FetchClient {
     }
 
     pub async fn fetch(&self, url: &str) -> Result<String, YahooError> {
-        let response = self
-            .client
+        self.fetch_with_timeout(url, DEFAULT_TIMEOUT).await
+    }
+
+    pub async fn fetch_with_timeout(&self, url: &str, timeout: Duration) -> Result<String, YahooError> {
+        // Create a request builder with timeout override
+        // Use tokio::time::timeout to ensure the request doesn't exceed the specified timeout
+        let response = match tokio::time::timeout(
+            timeout,
+            self.client
             .get(url)
+            .timeout(timeout) // Explicitly set timeout on the request
             .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
             .header("Accept-Language", "en-US,en;q=0.9")
             .header("Accept-Encoding", "gzip, deflate, br")
@@ -55,8 +63,17 @@ impl FetchClient {
             .header("sec-ch-ua-mobile", "?0")
             .header("sec-ch-ua-platform", r#""Windows""#)
             .send()
-            .await
-            .map_err(YahooError::NetworkError)?;
+        )
+        .await {
+            Ok(Ok(resp)) => resp,
+            Ok(Err(e)) => return Err(YahooError::NetworkError(e)),
+            Err(_) => {
+                // Timeout occurred - return a parse error with timeout message
+                return Err(YahooError::ParseError(
+                    format!("Request to {} timed out after {:?}", url, timeout)
+                ));
+            }
+        };
 
         let status = response.status();
         if !status.is_success() {

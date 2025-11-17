@@ -39,4 +39,3 @@ fn parse_search_results(data: Value) -> Result<SearchResponse, YahooError> {
 
     Ok(SearchResponse { results })
 }
-

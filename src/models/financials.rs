@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -39,8 +40,6 @@ impl Frequency {
     }
 }
 
-use std::collections::HashMap;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct FinancialStatement {
@@ -50,4 +49,3 @@ pub struct FinancialStatement {
     #[serde(rename = "statement")]
     pub statement: HashMap<String, HashMap<String, serde_json::Value>>,
 }
-

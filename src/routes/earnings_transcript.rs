@@ -36,4 +36,3 @@ pub async fn get_earnings_transcript_handler(
 
     Ok(HttpResponse::Ok().json(transcript))
 }
-

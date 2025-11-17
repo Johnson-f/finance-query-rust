@@ -153,4 +153,3 @@ pub fn get_statement_fields(statement_type: &str, frequency: &str) -> Vec<String
         .map(|field| format!("{}{}", frequency, field))
         .collect()
 }
-

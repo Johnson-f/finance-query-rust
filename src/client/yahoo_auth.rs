@@ -1,6 +1,6 @@
 use crate::client::error::YahooError;
 use chrono::{DateTime, Utc};
-use reqwest::{cookie::Jar, Client, ClientBuilder};
+use reqwest::{cookie::Jar, ClientBuilder};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing::{debug, error, info, warn};

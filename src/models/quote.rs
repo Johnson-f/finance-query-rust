@@ -257,4 +257,3 @@ impl From<Quote> for DetailedQuote {
         }
     }
 }
-

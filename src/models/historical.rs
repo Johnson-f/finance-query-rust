@@ -98,4 +98,3 @@ pub struct HistoricalData {
 pub struct HistoricalResponse {
     pub data: std::collections::HashMap<String, HistoricalData>,
 }
-
