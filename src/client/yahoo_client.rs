@@ -268,4 +268,14 @@ impl YahooFinanceClient {
         ];
         self.json(url, Some(&params)).await
     }
+
+    /// Make a Yahoo Finance API request and return the raw response
+    /// This is useful for endpoints that need custom handling
+    pub async fn make_request(
+        &self,
+        url: &str,
+        params: Option<&[(&str, &str)]>,
+    ) -> Result<reqwest::Response, YahooError> {
+        self.yahoo_request(url, params).await
+    }
 }

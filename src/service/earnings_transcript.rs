@@ -26,4 +26,3 @@ pub async fn get_earnings_transcript(
 ) -> Result<Value, YahooError> {
     yahoo_client.get_earnings_transcript(event_id, company_id).await
 }
-

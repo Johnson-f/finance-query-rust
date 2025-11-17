@@ -117,6 +117,41 @@ Get transcript for a specific earnings call:
 curl "http://localhost:8080/v1/earnings/AAPL/transcript/{event_id}"
 ```
 
+## Market Movers
+
+### Get Most Active Stocks
+Get the most actively traded stocks:
+```bash
+# Default count (50)
+curl "http://localhost:8080/v1/actives"
+
+# Custom count (25, 50, or 100)
+curl "http://localhost:8080/v1/actives?count=25"
+curl "http://localhost:8080/v1/actives?count=100"
+```
+
+### Get Top Gainers
+Get stocks with the highest price increases:
+```bash
+# Default count (50)
+curl "http://localhost:8080/v1/gainers"
+
+# Custom count (25, 50, or 100)
+curl "http://localhost:8080/v1/gainers?count=25"
+curl "http://localhost:8080/v1/gainers?count=100"
+```
+
+### Get Top Losers
+Get stocks with the highest price decreases:
+```bash
+# Default count (50)
+curl "http://localhost:8080/v1/losers"
+
+# Custom count (25, 50, or 100)
+curl "http://localhost:8080/v1/losers?count=25"
+curl "http://localhost:8080/v1/losers?count=100"
+```
+
 ## Pretty Print JSON Output
 
 Add `| jq` to format the JSON output (requires `jq` to be installed):
@@ -164,4 +199,3 @@ curl "http://localhost:8080/v1/historical/AAPL?range=1y&interval=1d"
 ```bash
 curl "http://localhost:8080/v1/search?q=apple"
 ```
-
