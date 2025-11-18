@@ -8,6 +8,7 @@ use actix::Actor;
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
 use client::{FetchClient, YahooAuthManager, YahooFinanceClient};
+use service::caching::CacheService;
 use service::websocket::ConnectionManager;
 use std::sync::Arc;
 use tracing::info;
@@ -18,10 +19,14 @@ pub struct AppState {
     pub fetch_client: Arc<FetchClient>,
     pub yahoo_client: Arc<YahooFinanceClient>,
     pub connection_manager: web::Data<service::websocket::ConnectionManagerAddr>,
+    pub cache_service: Arc<CacheService>,
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Load environment variables from .env file if it exists
+    dotenv::dotenv().ok();
+    
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
@@ -61,12 +66,17 @@ async fn main() -> std::io::Result<()> {
     let connection_manager = ConnectionManager::default().start();
     let connection_manager_data = web::Data::new(connection_manager);
 
+    // Initialize Redis cache service
+    let redis_url = std::env::var("REDIS_URL").ok();
+    let cache_service = Arc::new(CacheService::new(redis_url).await);
+
     // Create app state
     let app_state = web::Data::new(AppState {
         yahoo_auth_manager,
         fetch_client,
         yahoo_client,
         connection_manager: connection_manager_data.clone(),
+        cache_service,
     });
 
     info!("Starting HTTP server on 0.0.0.0:8080");

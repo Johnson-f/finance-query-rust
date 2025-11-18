@@ -1,7 +1,9 @@
 use actix_web::{web, HttpResponse, Result};
 use crate::models::{StatementType, Frequency};
 use crate::service;
+use crate::service::caching::{financials_key, TTL_FINANCIALS};
 use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Deserialize)]
 pub struct FinancialsQuery {
@@ -21,6 +23,14 @@ pub async fn get_financials_handler(
     let frequency = parse_frequency(&query.frequency)
         .map_err(|_| actix_web::error::ErrorBadRequest("Invalid frequency"))?;
 
+    let cache_key = financials_key(&symbol, &query.statement, &query.frequency);
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
+
+    // Cache miss - fetch from API
     let financials = service::get_financial_statement(
         &app_state.yahoo_client,
         &symbol,
@@ -28,6 +38,11 @@ pub async fn get_financials_handler(
         frequency,
     )
     .await?;
+
+    // Cache the result
+    let financials_json: Value = serde_json::to_value(&financials)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &financials_json, TTL_FINANCIALS).await;
 
     Ok(HttpResponse::Ok().json(financials))
 }

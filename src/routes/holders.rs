@@ -4,12 +4,20 @@ use crate::models::holders::{
     InstitutionalHoldersResponse, MajorHoldersResponse, MutualFundHoldersResponse,
 };
 use crate::service::holders;
+use crate::service::caching::{holders_key, TTL_HOLDERS};
+use serde_json::Value;
 
 pub async fn get_major_holders_handler(
     path: web::Path<String>,
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = holders_key(&symbol, "major");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = holders::get_holders_data(
         &app_state.yahoo_client,
@@ -24,6 +32,11 @@ pub async fn get_major_holders_handler(
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No major breakdown data"))?,
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_HOLDERS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -32,6 +45,12 @@ pub async fn get_institutional_holders_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = holders_key(&symbol, "institutional");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = holders::get_holders_data(
         &app_state.yahoo_client,
@@ -46,6 +65,11 @@ pub async fn get_institutional_holders_handler(
             .unwrap_or_default(),
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_HOLDERS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -54,6 +78,12 @@ pub async fn get_mutualfund_holders_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = holders_key(&symbol, "mutualfund");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = holders::get_holders_data(
         &app_state.yahoo_client,
@@ -68,6 +98,11 @@ pub async fn get_mutualfund_holders_handler(
             .unwrap_or_default(),
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_HOLDERS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -76,6 +111,12 @@ pub async fn get_insider_transactions_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = holders_key(&symbol, "insider_transactions");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = holders::get_holders_data(
         &app_state.yahoo_client,
@@ -90,6 +131,11 @@ pub async fn get_insider_transactions_handler(
             .unwrap_or_default(),
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_HOLDERS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -98,6 +144,12 @@ pub async fn get_insider_purchases_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = holders_key(&symbol, "insider_purchases");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = holders::get_holders_data(
         &app_state.yahoo_client,
@@ -112,6 +164,11 @@ pub async fn get_insider_purchases_handler(
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No insider purchases data"))?,
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_HOLDERS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -120,6 +177,12 @@ pub async fn get_insider_roster_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = holders_key(&symbol, "insider_roster");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = holders::get_holders_data(
         &app_state.yahoo_client,
@@ -133,6 +196,11 @@ pub async fn get_insider_roster_handler(
         roster: data.insider_roster
             .unwrap_or_default(),
     };
+    
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_HOLDERS).await;
     
     Ok(HttpResponse::Ok().json(response))
 }

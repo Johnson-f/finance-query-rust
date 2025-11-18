@@ -4,12 +4,20 @@ use crate::models::analysts::{
     RecommendationsResponse, RevenueEstimateResponse, UpgradesDowngradesResponse,
 };
 use crate::service::analysts;
+use crate::service::caching::{analysts_key, TTL_ANALYSTS};
+use serde_json::Value;
 
 pub async fn get_recommendations_handler(
     path: web::Path<String>,
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = analysts_key(&symbol, "recommendations");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = analysts::get_analysis_data(
         &app_state.yahoo_client,
@@ -34,6 +42,11 @@ pub async fn get_recommendations_handler(
         recommendations,
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_ANALYSTS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -42,6 +55,12 @@ pub async fn get_upgrades_downgrades_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = analysts_key(&symbol, "upgrades_downgrades");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = analysts::get_analysis_data(
         &app_state.yahoo_client,
@@ -66,6 +85,11 @@ pub async fn get_upgrades_downgrades_handler(
         upgrades_downgrades,
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_ANALYSTS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -74,6 +98,12 @@ pub async fn get_price_targets_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = analysts_key(&symbol, "price_targets");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = analysts::get_analysis_data(
         &app_state.yahoo_client,
@@ -98,6 +128,11 @@ pub async fn get_price_targets_handler(
         price_targets,
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_ANALYSTS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -106,6 +141,12 @@ pub async fn get_earnings_estimate_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = analysts_key(&symbol, "earnings_estimate");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = analysts::get_analysis_data(
         &app_state.yahoo_client,
@@ -130,6 +171,11 @@ pub async fn get_earnings_estimate_handler(
         earnings_estimate,
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_ANALYSTS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -138,6 +184,12 @@ pub async fn get_revenue_estimate_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = analysts_key(&symbol, "revenue_estimate");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = analysts::get_analysis_data(
         &app_state.yahoo_client,
@@ -162,6 +214,11 @@ pub async fn get_revenue_estimate_handler(
         revenue_estimate,
     };
     
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_ANALYSTS).await;
+    
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -170,6 +227,12 @@ pub async fn get_earnings_history_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
+    let cache_key = analysts_key(&symbol, "earnings_history");
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
     
     let data = analysts::get_analysis_data(
         &app_state.yahoo_client,
@@ -193,6 +256,11 @@ pub async fn get_earnings_history_handler(
         symbol: symbol_str,
         earnings_history,
     };
+    
+    // Cache the result
+    let response_json: Value = serde_json::to_value(&response)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &response_json, TTL_ANALYSTS).await;
     
     Ok(HttpResponse::Ok().json(response))
 }

@@ -1,6 +1,8 @@
 use actix_web::{web, HttpResponse, Result};
 use crate::service;
+use crate::service::caching::{news_key, TTL_NEWS};
 use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Deserialize)]
 pub struct NewsQuery {
@@ -11,6 +13,14 @@ pub async fn get_news_handler(
     query: web::Query<NewsQuery>,
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
+    let cache_key = news_key(query.symbol.as_deref());
+    
+    // Check cache first
+    if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
+        return Ok(HttpResponse::Ok().json(cached));
+    }
+    
+    // Cache miss - fetch from API
     let news = if let Some(symbol) = &query.symbol {
         service::scrape_news_for_quote(
             &app_state.fetch_client,
@@ -23,6 +33,11 @@ pub async fn get_news_handler(
         )
         .await?
     };
+
+    // Cache the result
+    let news_json: Value = serde_json::to_value(&news)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
+    app_state.cache_service.set(&cache_key, &news_json, TTL_NEWS).await;
 
     Ok(HttpResponse::Ok().json(news))
 }
