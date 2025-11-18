@@ -1825,7 +1825,6 @@ dependencies = [
  "sha1_smol",
  "socket2 0.5.10",
  "tokio",
- "tokio-native-tls",
  "tokio-util",
  "url",
 ]

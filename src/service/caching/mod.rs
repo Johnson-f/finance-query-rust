@@ -2,7 +2,8 @@ use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{error, warn};
+use tokio::time::{timeout, Duration};
+use tracing::{error, info, warn};
 
 pub struct CacheService {
     connection: Option<Arc<ConnectionManager>>,
@@ -17,24 +18,35 @@ impl CacheService {
                 return Self { connection: None };
             }
         };
+
+        info!("Attempting to connect to Redis...");
         
         match redis::Client::open(redis_url.as_str()) {
             Ok(client) => {
-                match ConnectionManager::new(client).await {
-                    Ok(connection) => {
-                        tracing::info!("Redis connection established");
+                // Add a 10-second timeout for remote connections
+                match timeout(Duration::from_secs(10), ConnectionManager::new(client)).await {
+                    Ok(Ok(connection)) => {
+                        info!("✓ Redis connection established successfully");
                         Self {
                             connection: Some(Arc::new(connection)),
                         }
                     }
-                    Err(e) => {
-                        warn!("Failed to connect to Redis: {}. Caching will be disabled.", e);
+                    Ok(Err(e)) => {
+                        warn!("✗ Failed to connect to Redis: {}. Caching will be disabled.", e);
+                        warn!("  Check your network connection and Redis credentials");
+                        Self { connection: None }
+                    }
+                    Err(_) => {
+                        warn!("✗ Redis connection timeout (10s). Caching will be disabled.");
+                        warn!("  This usually means the Redis server is unreachable");
+                        warn!("  Check your firewall, network, or Redis host configuration");
                         Self { connection: None }
                     }
                 }
             }
             Err(e) => {
-                warn!("Failed to create Redis client: {}. Caching will be disabled.", e);
+                warn!("✗ Failed to create Redis client: {}. Caching will be disabled.", e);
+                warn!("  Check your REDIS_URL format");
                 Self { connection: None }
             }
         }
