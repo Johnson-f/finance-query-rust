@@ -96,12 +96,8 @@ pub async fn get_simple_quotes(
                     data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
             }
             
-            let mut quotes = parse_simple_quotes_from_api(data)?;
-            // Fetch logos for all quotes
-            for quote in &mut quotes {
-                let symbol = quote.symbol.clone();
-                quote.logo = logo::get_logo(fetch_client, Some(&symbol), None).await;
-            }
+            let quotes = parse_simple_quotes_from_api(data)?;
+            // Skip logo fetching for WebSocket performance
             info!("Successfully parsed {} simple quotes from API", quotes.len());
             Ok(quotes)
         }
@@ -113,10 +109,9 @@ pub async fn get_simple_quotes(
                 match scraper::scrape_simple_quote(fetch_client, symbol).await {
                     Ok(quote_data) => {
                         debug!("Scraped simple quote data for {}: {:?}", symbol, quote_data);
-                        if let Ok(mut quote) = parse_simple_quote_from_scraped(quote_data) {
+                        if let Ok(quote) = parse_simple_quote_from_scraped(quote_data) {
                             info!("Successfully parsed scraped simple quote for {}", symbol);
-                            // Fetch logo for scraped simple quote
-                            quote.logo = logo::get_logo(fetch_client, Some(symbol), None).await;
+                            // Skip logo fetching for WebSocket performance
                             quotes.push(quote);
                         } else {
                             error!("Failed to parse scraped simple quote data for {}", symbol);

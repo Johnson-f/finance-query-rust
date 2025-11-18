@@ -1,5 +1,14 @@
 use actix_web::{web, HttpResponse, Result};
 use crate::service;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct EarningsTranscriptQuery {
+    #[serde(default)]
+    quarter: Option<String>,
+    #[serde(default)]
+    year: Option<i32>,
+}
 
 pub async fn get_earnings_calls_handler(
     path: web::Path<String>,
@@ -18,19 +27,18 @@ pub async fn get_earnings_calls_handler(
 }
 
 pub async fn get_earnings_transcript_handler(
-    path: web::Path<(String, String)>,
+    path: web::Path<String>,
+    query: web::Query<EarningsTranscriptQuery>,
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
-    let (_symbol, event_id) = path.into_inner();
-    
-    // First, we need to get the company_id (quartrId) for the symbol
-    // This is a simplified version - you may need to fetch quote_type first
-    let company_id = "unknown"; // TODO: Fetch from get_quote_type
+    let symbol = path.into_inner();
     
     let transcript = service::get_earnings_transcript(
         &app_state.yahoo_client,
-        &event_id,
-        company_id,
+        &app_state.fetch_client,
+        &symbol,
+        query.quarter.clone(),
+        query.year,
     )
     .await?;
 

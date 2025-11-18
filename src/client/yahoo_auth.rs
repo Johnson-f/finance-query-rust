@@ -1,7 +1,8 @@
 use crate::client::error::YahooError;
 use chrono::{DateTime, Utc};
 use reqwest::{cookie::Jar, ClientBuilder};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
@@ -32,7 +33,7 @@ impl YahooAuthManager {
 
     pub async fn refresh(&self) -> Result<(), YahooError> {
         info!("Refreshing Yahoo authentication...");
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().await;
         let cookie_jar = state.cookie_jar.clone();
         drop(state);
 
@@ -134,7 +135,7 @@ impl YahooAuthManager {
             }
             
             info!("Successfully obtained crumb from query2 (length: {})", crumb2.len());
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock().await;
             state.crumb = Some(crumb2);
             state.last_update = Some(Utc::now());
             return Ok(());
@@ -142,7 +143,7 @@ impl YahooAuthManager {
 
         // Successfully obtained crumb from query1
         info!("Successfully obtained crumb (length: {})", crumb.len());
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().await;
         state.crumb = Some(crumb);
         state.last_update = Some(Utc::now());
 
@@ -150,7 +151,7 @@ impl YahooAuthManager {
     }
 
     pub async fn get_or_refresh(&self) -> Result<(Arc<Jar>, String), YahooError> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().await;
 
         let needs_refresh = state.crumb.is_none()
             || state.last_update.is_none()
@@ -162,7 +163,7 @@ impl YahooAuthManager {
                 state.last_update);
             drop(state); // Release lock before async operation
             self.refresh().await?;
-            state = self.state.lock().unwrap();
+            state = self.state.lock().await;
         } else {
             debug!("Using cached crumb (age: {}s)", 
                 state.last_update.map(|t| (Utc::now() - t).num_seconds()).unwrap_or(0));
@@ -180,7 +181,7 @@ impl YahooAuthManager {
         Ok((state.cookie_jar.clone(), crumb))
     }
 
-    pub fn crumb(&self) -> Option<String> {
-        self.state.lock().unwrap().crumb.clone()
+    pub async fn crumb(&self) -> Option<String> {
+        self.state.lock().await.crumb.clone()
     }
 }

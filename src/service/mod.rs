@@ -10,6 +10,8 @@ pub mod indices;
 pub mod holders;
 pub mod analysts;
 pub mod sectors;
+pub mod market;
+pub mod websocket;
 
 pub use quotes::{get_quotes, get_simple_quotes, get_similar_quotes};
 pub use historical::get_historical;
