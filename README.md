@@ -16,14 +16,14 @@ A high-performance financial data API built with Rust and Actix-Web, providing r
 
 ### Prerequisites
 
-- Rust 1.70+ (Rust 2021 edition)
+- Rust 1.70+ (Rust 2024 edition)
 - Redis (optional, for caching and rate limiting)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/Verdenroz/finance-query-rust.git
+git clone https://github.com/Johnson-f/finance-query-rust.git
 cd finance-query-rust
 
 # For development
