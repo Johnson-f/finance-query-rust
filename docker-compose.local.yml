@@ -1,0 +1,31 @@
+version: '3.8'
+
+# Local development setup (without HTTPS)
+# Uses external cloud Redis service (e.g., Sevalla Redis)
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finance-query-rust
+    ports:
+      - "8080:8080"
+    environment:
+      # Redis configuration - Use external cloud Redis service
+      # Set REDIS_URL in .env file: redis://your-redis-host:6379
+      - REDIS_URL=${REDIS_URL:-}
+      # Rate limiting configuration
+      - RATE_LIMIT_PER_DAY=10000
+      # Logging configuration
+      - RUST_LOG=info
+      # Proxy configuration (optional, uncomment if needed)
+      # - PROXY_URL=http://proxy.example.com:8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
