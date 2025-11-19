@@ -1,4 +1,5 @@
 mod client;
+mod middleware;
 mod models;
 mod routes;
 mod service;
@@ -8,6 +9,7 @@ use actix::Actor;
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
 use client::{FetchClient, YahooAuthManager, YahooFinanceClient};
+use middleware::rate_limit::RateLimitManager;
 use service::caching::CacheService;
 use service::websocket::ConnectionManager;
 use std::sync::Arc;
@@ -20,6 +22,7 @@ pub struct AppState {
     pub yahoo_client: Arc<YahooFinanceClient>,
     pub connection_manager: web::Data<service::websocket::ConnectionManagerAddr>,
     pub cache_service: Arc<CacheService>,
+    pub rate_limit_manager: Arc<RateLimitManager>,
 }
 
 #[actix_web::main]
@@ -68,7 +71,22 @@ async fn main() -> std::io::Result<()> {
 
     // Initialize Redis cache service
     let redis_url = std::env::var("REDIS_URL").ok();
-    let cache_service = Arc::new(CacheService::new(redis_url).await);
+    let cache_service = Arc::new(CacheService::new(redis_url.clone()).await);
+
+    // Load rate limit configuration from environment
+    let rate_limit_per_day = std::env::var("RATE_LIMIT_PER_DAY")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok());
+
+    // Initialize rate limit manager
+    let rate_limit_manager = Arc::new(
+        RateLimitManager::new(redis_url.clone(), rate_limit_per_day).await
+    );
+    
+    info!(
+        "Rate limiting configured: {} requests per day per IP",
+        rate_limit_manager.limit_per_day()
+    );
 
     // Create app state
     let app_state = web::Data::new(AppState {
@@ -77,6 +95,7 @@ async fn main() -> std::io::Result<()> {
         yahoo_client,
         connection_manager: connection_manager_data.clone(),
         cache_service,
+        rate_limit_manager: rate_limit_manager.clone(),
     });
 
     info!("Starting HTTP server on 0.0.0.0:8080");
@@ -94,6 +113,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(connection_manager_data.clone())
             .wrap(cors)
             .wrap(TracingLogger::default())
+            .wrap(middleware::rate_limit::RateLimitMiddleware::new(rate_limit_manager.clone()))
             .configure(routes::configure_routes)
     })
     .bind("0.0.0.0:8080")?

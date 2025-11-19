@@ -1,5 +1,5 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::sectors::{MarketSector, MarketSectorDetails, Sector};
+use crate::models::sectors::Sector;
 use crate::service;
 use std::str::FromStr;
 

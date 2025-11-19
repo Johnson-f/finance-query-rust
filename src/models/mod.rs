@@ -15,17 +15,6 @@ pub use historical::{HistoricalData, HistoricalResponse, TimeRange, Interval};
 pub use news::News;
 pub use search::{SearchResult, SearchResponse};
 pub use financials::{FinancialStatement, StatementType, Frequency};
-pub use movers::{MarketMover, MoverCount};
-pub use indices::{Index, Region, MarketIndex};
-pub use holders::{
-    HolderType, InsiderPurchasesResponse, InsiderRosterResponse, InsiderTransactionsResponse,
-    InstitutionalHoldersResponse, MajorHoldersResponse, MutualFundHoldersResponse,
-};
-pub use analysts::{
-    AnalysisType, EarningsEstimateResponse, EarningsHistoryResponse, PriceTargetsResponse,
-    RecommendationsResponse, RevenueEstimateResponse, UpgradesDowngradesResponse,
-};
-pub use sectors::{MarketSector, MarketSectorDetails, Sector};
 pub use earnings_transcripts::{
-    Quarter, EarningsCallListing, EarningsCallsList, TranscriptSpeaker, TranscriptParagraph, EarningsTranscript,
+    EarningsCallListing, EarningsCallsList, TranscriptSpeaker, TranscriptParagraph, EarningsTranscript,
 };

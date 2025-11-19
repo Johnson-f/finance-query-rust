@@ -11,7 +11,7 @@ The Finance Query API provides real-time updates via WebSocket connections. This
 
 ## Features
 
-- **Real-time Updates:** Data is pushed to the client as soon as it's available (typically updated every 10 seconds).
+- **Real-time Updates:** Data is pushed to the client as soon as it's available (updated every 5 seconds).
 - **Efficient:** Reduces network overhead compared to polling.
 - **Resilient:** Supports reconnection handling.
 

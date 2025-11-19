@@ -162,6 +162,7 @@ fn get_raw(data: &Value, key: &str) -> Option<i64> {
 }
 
 // Helper function to format date
+#[allow(dead_code)]
 fn format_date(date_val: Option<&Value>) -> Option<String> {
     date_val.and_then(|d| {
         if let Some(str_val) = d.as_str() {
@@ -356,6 +357,7 @@ async fn parse_quote_from_summary(
     })
 }
 
+#[allow(dead_code)]
 fn parse_quotes_from_api(data: Value) -> Result<Vec<Quote>, YahooError> {
     let mut quotes = Vec::new();
     
@@ -388,6 +390,7 @@ fn parse_quotes_from_api(data: Value) -> Result<Vec<Quote>, YahooError> {
     Ok(quotes)
 }
 
+#[allow(dead_code)]
 fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
     let symbol = result.get("symbol")
         .and_then(|s| s.as_str())

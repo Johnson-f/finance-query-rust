@@ -4,7 +4,7 @@ use crate::service::websocket::{ConnectionManagerAddr, handle_websocket_session,
 use crate::AppState;
 use serde_json::{json, Value};
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::time::sleep;
 use tracing::{error, info};
 
 use super::common::REFRESH_INTERVAL;

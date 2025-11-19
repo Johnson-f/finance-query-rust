@@ -1,5 +1,5 @@
 use actix_ws::{Message, Session};
-use crate::service::websocket::connection_manager::{BroadcastMessage, Connect, Disconnect, ConnectionManagerAddr};
+use crate::service::websocket::connection_manager::{Connect, Disconnect, ConnectionManagerAddr};
 use futures_util::StreamExt;
 use serde_json::Value;
 use std::time::{Duration, Instant};

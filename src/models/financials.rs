@@ -13,6 +13,7 @@ pub enum StatementType {
 }
 
 impl StatementType {
+    #[allow(dead_code)]
     pub fn as_str(&self) -> &'static str {
         match self {
             StatementType::IncomeStatement => "income",

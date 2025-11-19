@@ -8,6 +8,7 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct FetchClient {
     client: Client,
     cookie_jar: Arc<Jar>,
+    #[allow(dead_code)]
     proxy: Option<String>,
 }
 

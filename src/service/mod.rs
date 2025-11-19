@@ -24,6 +24,4 @@ pub use earnings_transcript::{get_earnings_calls_list, get_earnings_transcript};
 pub use logo::get_logo;
 pub use movers::{get_actives, get_gainers, get_losers};
 pub use indices::get_indices;
-pub use holders::get_holders_data;
-pub use analysts::get_analysis_data;
 pub use sectors::{get_sectors, get_sector_for_symbol, get_sector_details};

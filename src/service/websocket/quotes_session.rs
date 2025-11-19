@@ -32,7 +32,6 @@ pub async fn handle_quotes_websocket_session(
     
     let mut symbols_received = false;
     let mut channel: Option<String> = None;
-    let mut tx: Option<mpsc::UnboundedSender<Value>> = None;
     let mut send_task: Option<tokio::task::JoinHandle<()>> = None;
     
     // Main loop: wait for symbols, then handle messages
@@ -71,7 +70,6 @@ pub async fn handle_quotes_websocket_session(
                             
                             // Create channel for receiving broadcast messages
                             let (broadcast_tx, mut broadcast_rx) = mpsc::unbounded_channel::<Value>();
-                            tx = Some(broadcast_tx.clone());
                             
                             // Register with connection manager
                             manager.do_send(Connect {

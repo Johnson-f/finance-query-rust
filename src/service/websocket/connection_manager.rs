@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use tokio::task::JoinHandle;
 use tokio::sync::mpsc;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Session entry with unique ID for tracking
 #[derive(Clone)]

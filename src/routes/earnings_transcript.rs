@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Result};
 use crate::service;
-use crate::service::caching::{earnings_transcript_key, CacheService, TTL_EARNINGS_TRANSCRIPT};
+use crate::service::caching::{earnings_transcript_key, TTL_EARNINGS_TRANSCRIPT};
 use serde::Deserialize;
 use serde_json::Value;
 

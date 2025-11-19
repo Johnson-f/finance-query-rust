@@ -31,6 +31,7 @@ impl HolderType {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "major" => Some(HolderType::Major),
@@ -171,6 +172,7 @@ pub struct InsiderRosterResponse {
 #[derive(Debug, Clone)]
 pub struct HoldersData {
     pub symbol: String,
+    #[allow(dead_code)]
     pub holder_type: HolderType,
     pub major_breakdown: Option<MajorHoldersBreakdown>,
     pub institutional_holders: Option<Vec<InstitutionalHolder>>,

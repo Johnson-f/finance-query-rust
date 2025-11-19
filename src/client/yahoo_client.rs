@@ -8,6 +8,7 @@ use tracing::{debug, error, info, warn};
 
 pub struct YahooFinanceClient {
     auth_manager: Arc<YahooAuthManager>,
+    #[allow(dead_code)]
     fetch_client: Arc<FetchClient>,
 }
 

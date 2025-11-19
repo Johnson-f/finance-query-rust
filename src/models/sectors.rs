@@ -40,6 +40,7 @@ impl Sector {
         }
     }
 
+    #[allow(dead_code)]
     pub fn url_path(&self) -> &'static str {
         match self {
             Sector::BasicMaterials => "basic-materials",
@@ -56,6 +57,7 @@ impl Sector {
         }
     }
 
+    #[allow(dead_code)]
     pub fn all() -> Vec<Sector> {
         vec![
             Sector::Technology,
