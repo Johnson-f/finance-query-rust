@@ -12,7 +12,7 @@ Here is a list of important resources for contributors:
 - [Code of Conduct]
 
 [MIT license]: https://opensource.org/licenses/MIT
-[Documentation]: https://verdenroz.github.io/finance-query-rust/
+[Documentation]: https://johnson-f.github.io/finance-query-rust/
 [Source Code]: https://github.com/Verdenroz/finance-query-rust
 [Issue Tracker]: https://github.com/Verdenroz/finance-query-rust/issues
 [Code of Conduct]: https://github.com/Verdenroz/finance-query-rust/CODE_OF_CONDUCT.md

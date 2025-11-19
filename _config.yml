@@ -1,0 +1,57 @@
+# GitHub Pages Configuration for Finance Query Rust API
+
+title: Finance Query Rust API
+description: A high-performance financial data API built with Rust and Actix-Web
+url: https://johnson-f.github.io
+# Update this to match your repository name exactly
+baseurl: /finance-query-rust
+
+# Jekyll settings
+theme: jekyll-theme-minimal
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+
+# Navigation
+navigation:
+  - title: Home
+    url: /
+  - title: Getting Started
+    url: /docs/getting-started
+  - title: API Documentation
+    url: /docs/api
+  - title: Development
+    url: /docs/development
+  - title: Deployment
+    url: /docs/deployment
+
+# Exclude files from processing
+exclude:
+  - README.md
+  - LICENSE
+  - Cargo.toml
+  - Cargo.lock
+  - Dockerfile
+  - docker-compose.yml
+  - docker-compose.local.yml
+  - .dockerignore
+  - setup-ssl.sh
+  - start.sh
+  - target/
+  - src/
+  - nginx/
+  - .git/
+  - .github/
+
+# Markdown settings
+markdown: kramdown
+kramdown:
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    block:
+      line_numbers: true
+
+# Build settings
+sass:
+  style: compressed
+
