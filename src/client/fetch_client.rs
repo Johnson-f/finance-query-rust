@@ -2,6 +2,7 @@ use crate::client::error::YahooError;
 use reqwest::{cookie::Jar, Client, ClientBuilder};
 use std::sync::Arc;
 use std::time::Duration;
+use std::io::Read;
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -47,6 +48,92 @@ impl FetchClient {
 
     pub async fn fetch(&self, url: &str) -> Result<String, YahooError> {
         self.fetch_with_timeout(url, DEFAULT_TIMEOUT).await
+    }
+
+    /// Fetch a URL expecting JSON response with proper Accept header
+    pub async fn fetch_json(&self, url: &str) -> Result<String, YahooError> {
+        self.fetch_json_with_timeout(url, DEFAULT_TIMEOUT).await
+    }
+
+    /// Fetch a URL expecting JSON response with timeout and proper Accept header
+    /// Note: Accept-Encoding is not set to avoid compression issues with JSON parsing
+    pub async fn fetch_json_with_timeout(&self, url: &str, timeout: Duration) -> Result<String, YahooError> {
+        let response = match tokio::time::timeout(
+            timeout,
+            self.client
+            .get(url)
+            .timeout(timeout)
+            .header("Accept", "application/json")
+            .header("Accept-Language", "en-US,en;q=0.9")
+            // Don't request compression for JSON - it's usually small and compression can cause parsing issues
+            .header("sec-ch-ua", r#""Chromium";v="122", "Google Chrome";v="122""#)
+            .header("sec-ch-ua-mobile", "?0")
+            .header("sec-ch-ua-platform", r#""Windows""#)
+            .send()
+        )
+        .await {
+            Ok(Ok(resp)) => resp,
+            Ok(Err(e)) => return Err(YahooError::NetworkError(e)),
+            Err(_) => {
+                return Err(YahooError::ParseError(
+                    format!("Request to {} timed out after {:?}", url, timeout)
+                ));
+            }
+        };
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(YahooError::HttpError(
+                status.as_u16(),
+                format!("HTTP {}: {}", status, response.status().canonical_reason().unwrap_or("Unknown")),
+            ));
+        }
+
+        // Check Content-Encoding header to see if response is compressed
+        let content_encoding = response.headers()
+            .get("content-encoding")
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("")
+            .to_lowercase();
+
+        let bytes = response.bytes().await.map_err(YahooError::NetworkError)?;
+        
+        // If response is compressed, decompress it
+        let text = if content_encoding.contains("gzip") || content_encoding.contains("deflate") {
+            // Try to decompress gzip/deflate
+            let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
+            let mut decompressed = String::new();
+            decoder.read_to_string(&mut decompressed)
+                .map_err(|e| YahooError::ParseError(format!("Failed to decompress gzip response: {}", e)))?;
+            decompressed
+        } else if content_encoding.contains("br") {
+            // Brotli compression - reqwest should handle this automatically, but if not, return error
+            return Err(YahooError::ParseError(
+                "Brotli compression detected but not automatically decompressed. This should not happen.".to_string()
+            ));
+        } else {
+            // Try to convert bytes to string
+            match String::from_utf8(bytes.to_vec()) {
+                Ok(text) => text,
+                Err(_) => {
+                    // If not valid UTF-8, might be compressed without Content-Encoding header
+                    // Try to decompress as gzip
+                    let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
+                    let mut decompressed = String::new();
+                    match decoder.read_to_string(&mut decompressed) {
+                        Ok(_) => decompressed,
+                        Err(_) => {
+                            // Not gzip either, return original error
+                            return Err(YahooError::ParseError(
+                                format!("Response is not valid UTF-8 and not gzip compressed (length: {} bytes)", bytes.len())
+                            ));
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(text)
     }
 
     pub async fn fetch_with_timeout(&self, url: &str, timeout: Duration) -> Result<String, YahooError> {

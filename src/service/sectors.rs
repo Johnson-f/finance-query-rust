@@ -2,7 +2,7 @@ use crate::client::{error::YahooError, FetchClient, YahooFinanceClient};
 use crate::models::sectors::{MarketSector, MarketSectorDetails, Sector};
 use serde_json;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, debug, warn};
 
 const API_BASE_URL: &str = "https://finance-query.onrender.com/v1";
 
@@ -13,10 +13,32 @@ pub async fn get_sectors(
     info!("Fetching sector data for all sectors from API");
     
     let url = format!("{}/sectors", API_BASE_URL);
-    let response_text = fetch_client.fetch(&url).await?;
+    let response_text = fetch_client.fetch_json(&url).await?;
     
-    let sectors: Vec<MarketSector> = serde_json::from_str(&response_text)
-        .map_err(|e| YahooError::ParseError(format!("Failed to parse sectors JSON: {}", e)))?;
+    // Validate response is not empty or whitespace
+    let trimmed = response_text.trim();
+    if trimmed.is_empty() {
+        warn!("Empty response received from {}", url);
+        return Err(YahooError::ParseError(format!(
+            "Empty response received from {} (response length: {} bytes)",
+            url, response_text.len()
+        )));
+    }
+    
+    debug!("Response from {} (length: {} bytes, preview: {})", 
+           url, 
+           response_text.len(),
+           trimmed.chars().take(200).collect::<String>());
+    
+    let sectors: Vec<MarketSector> = serde_json::from_str(trimmed)
+        .map_err(|e| {
+            warn!("Failed to parse JSON from {}: {}. Response preview: {}", 
+                  url, e, trimmed.chars().take(200).collect::<String>());
+            YahooError::ParseError(format!(
+                "Failed to parse sectors JSON from {} (response length: {} bytes): {}", 
+                url, response_text.len(), e
+            ))
+        })?;
     
     info!("Successfully fetched {} sectors", sectors.len());
     Ok(sectors)
@@ -31,10 +53,32 @@ pub async fn get_sector_for_symbol(
     info!("Fetching sector for symbol: {} from API", symbol);
     
     let url = format!("{}/sectors/symbol/{}", API_BASE_URL, symbol);
-    let response_text = fetch_client.fetch(&url).await?;
+    let response_text = fetch_client.fetch_json(&url).await?;
     
-    let sector: MarketSector = serde_json::from_str(&response_text)
-        .map_err(|e| YahooError::ParseError(format!("Failed to parse sector JSON for {}: {}", symbol, e)))?;
+    // Validate response is not empty or whitespace
+    let trimmed = response_text.trim();
+    if trimmed.is_empty() {
+        warn!("Empty response received from {} for symbol {}", url, symbol);
+        return Err(YahooError::ParseError(format!(
+            "Empty response received from {} for symbol {} (response length: {} bytes)",
+            url, symbol, response_text.len()
+        )));
+    }
+    
+    debug!("Response from {} (length: {} bytes, preview: {})", 
+           url, 
+           response_text.len(),
+           trimmed.chars().take(200).collect::<String>());
+    
+    let sector: MarketSector = serde_json::from_str(trimmed)
+        .map_err(|e| {
+            warn!("Failed to parse JSON from {} for symbol {}: {}. Response preview: {}", 
+                  url, symbol, e, trimmed.chars().take(200).collect::<String>());
+            YahooError::ParseError(format!(
+                "Failed to parse sector JSON from {} for symbol {} (response length: {} bytes): {}", 
+                url, symbol, response_text.len(), e
+            ))
+        })?;
     
     Ok(sector)
 }
@@ -52,10 +96,32 @@ pub async fn get_sector_details(
     let encoded_sector = sector_name.replace(' ', "%20");
     let url = format!("{}/sectors/details/{}", API_BASE_URL, encoded_sector);
     
-    let response_text = fetch_client.fetch(&url).await?;
+    let response_text = fetch_client.fetch_json(&url).await?;
     
-    let details: MarketSectorDetails = serde_json::from_str(&response_text)
-        .map_err(|e| YahooError::ParseError(format!("Failed to parse sector details JSON for {}: {}", sector_name, e)))?;
+    // Validate response is not empty or whitespace
+    let trimmed = response_text.trim();
+    if trimmed.is_empty() {
+        warn!("Empty response received from {} for sector {}", url, sector_name);
+        return Err(YahooError::ParseError(format!(
+            "Empty response received from {} for sector {} (response length: {} bytes)",
+            url, sector_name, response_text.len()
+        )));
+    }
+    
+    debug!("Response from {} (length: {} bytes, preview: {})", 
+           url, 
+           response_text.len(),
+           trimmed.chars().take(200).collect::<String>());
+    
+    let details: MarketSectorDetails = serde_json::from_str(trimmed)
+        .map_err(|e| {
+            warn!("Failed to parse JSON from {} for sector {}: {}. Response preview: {}", 
+                  url, sector_name, e, trimmed.chars().take(200).collect::<String>());
+            YahooError::ParseError(format!(
+                "Failed to parse sector details JSON from {} for sector {} (response length: {} bytes): {}", 
+                url, sector_name, response_text.len(), e
+            ))
+        })?;
     
     Ok(details)
 }

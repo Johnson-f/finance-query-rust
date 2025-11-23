@@ -6,7 +6,8 @@ edition = "2024"
 [dependencies]
 actix-web = { version = "4", features = ["macros"] }
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.11", features = ["cookies", "json"] }
+reqwest = { version = "0.11", features = ["cookies", "json", "gzip", "brotli"] }
+flate2 = "1.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 scraper = "0.19"

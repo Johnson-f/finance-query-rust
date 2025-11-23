@@ -25,6 +25,7 @@ pub fn configure_routes(cfg: &mut actix_web::web::ServiceConfig) {
             .route("/historical/{symbol}", web::get().to(historical::get_historical_handler))
             .route("/search", web::get().to(search::search_handler))
             .route("/news", web::get().to(news::get_news_handler))
+            .route("/news/{symbol}", web::get().to(news::get_news_by_symbol_handler))
             .route("/financials/{symbol}", web::get().to(financials::get_financials_handler))
             .route("/earnings/{symbol}/calls", web::get().to(earnings_transcript::get_earnings_calls_handler))
             .route("/earnings/{symbol}/transcript", web::get().to(earnings_transcript::get_earnings_transcript_handler))
