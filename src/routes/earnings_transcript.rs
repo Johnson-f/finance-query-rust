@@ -57,7 +57,7 @@ pub async fn get_earnings_transcript_handler(
         return Ok(HttpResponse::Ok().json(cached));
     }
     
-    // Cache miss - fetch from API
+    // Cache miss - fetch from scraper
     let transcript = service::get_earnings_transcript(
         &app_state.yahoo_client,
         &app_state.fetch_client,

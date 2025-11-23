@@ -3,6 +3,120 @@ use crate::client::FetchClient;
 use scraper::{Html, Selector};
 use std::sync::Arc;
 use tracing::{debug, warn};
+use serde_json::Value;
+
+// Helper function to extract a JSON object from a string
+fn extract_json_object(json_str: &str) -> Result<Value, YahooError> {
+    let mut brace_count = 0;
+    let mut in_string = false;
+    let mut escape_next = false;
+    let mut json_end = 0;
+    
+    for (i, ch) in json_str.char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+        
+        match ch {
+            '\\' if in_string => escape_next = true,
+            '"' => in_string = !in_string,
+            '{' if !in_string => {
+                if brace_count == 0 {
+                    // This is the start
+                }
+                brace_count += 1;
+            }
+            '}' if !in_string => {
+                brace_count -= 1;
+                if brace_count == 0 {
+                    json_end = i + 1;
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    if json_end > 0 {
+        let json_slice = &json_str[..json_end];
+        serde_json::from_str(json_slice)
+            .map_err(|e| YahooError::ParseError(format!("Failed to parse JSON: {}", e)))
+    } else {
+        Err(YahooError::ParseError("Could not find complete JSON object".to_string()))
+    }
+}
+
+// Helper function to find transcript data in nested JSON structure (root.App.main[0][3][1][0])
+fn find_transcript_in_nested_json(value: &Value) -> Option<Value> {
+    // Try common paths in Yahoo Finance structure
+    let paths = vec![
+        vec!["0", "3", "1", "0"],
+        vec!["0", "3", "1"],
+        vec!["0", "3"],
+        vec!["0"],
+    ];
+    
+    for path in paths {
+        let mut current = value;
+        let mut found = true;
+        
+        for key in &path {
+            if let Some(index) = key.parse::<usize>().ok() {
+                if let Some(arr) = current.as_array() {
+                    if let Some(item) = arr.get(index) {
+                        current = item;
+                    } else {
+                        found = false;
+                        break;
+                    }
+                } else {
+                    found = false;
+                    break;
+                }
+            }
+        }
+        
+        if found {
+            // Check if this contains transcript data
+            if current.get("transcriptContent").is_some() {
+                return Some(current.clone());
+            }
+            // Recursively search in this object
+            if let Some(transcript) = search_for_transcript(current) {
+                return Some(transcript);
+            }
+        }
+    }
+    
+    // Fallback: recursive search
+    search_for_transcript(value)
+}
+
+fn search_for_transcript(value: &Value) -> Option<Value> {
+    match value {
+        Value::Object(map) => {
+            if map.contains_key("transcriptContent") {
+                return Some(Value::Object(map.clone()));
+            }
+            for v in map.values() {
+                if let Some(result) = search_for_transcript(v) {
+                    return Some(result);
+                }
+            }
+            None
+        }
+        Value::Array(arr) => {
+            for item in arr {
+                if let Some(result) = search_for_transcript(item) {
+                    return Some(result);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
 
 pub async fn scrape_quote(
     fetch_client: &Arc<FetchClient>,
@@ -173,4 +287,279 @@ pub async fn scrape_earnings_calls_list(
     }
 
     Ok(calls)
+}
+
+pub async fn scrape_earnings_transcript_from_url(
+    fetch_client: &Arc<FetchClient>,
+    url: &str,
+) -> Result<Value, YahooError> {
+    debug!("Fetching earnings transcript from URL: {}", url);
+    let html = fetch_client.fetch(url).await?;
+    debug!("Fetched HTML page, length: {} bytes", html.len());
+
+    let document = Html::parse_document(&html);
+
+    // Try to extract embedded JSON data from script tags (common pattern for Yahoo Finance)
+    let script_selector = Selector::parse("script")
+        .map_err(|e| YahooError::ParseError(format!("Failed to parse script selector: {}", e)))?;
+    
+    // Look for script tags containing transcript data
+    for script in document.select(&script_selector) {
+        let script_text: String = script.text().collect();
+        
+        // Look for common patterns like "transcriptContent" or "root.App.main"
+        if script_text.contains("transcriptContent") || script_text.contains("root.App.main") {
+            // Try multiple extraction strategies
+            
+            // Strategy 1: Look for root.App.main pattern
+            if script_text.contains("root.App.main") {
+                if let Some(start) = script_text.find("root.App.main") {
+                    let after_main = &script_text[start..];
+                    // Find the assignment
+                    if let Some(assign_pos) = after_main.find('=') {
+                        let json_start = &after_main[assign_pos + 1..].trim_start();
+                        if let Some(brace_start) = json_start.find('{') {
+                            let json_str = &json_start[brace_start..];
+                            if let Ok(parsed) = extract_json_object(json_str) {
+                                // Navigate through the structure: root.App.main[0][3][1][0]
+                                if let Some(transcript_data) = find_transcript_in_nested_json(&parsed) {
+                                    debug!("Found transcript data in root.App.main");
+                                    return Ok(transcript_data);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Strategy 2: Direct transcriptContent pattern
+            if script_text.contains("transcriptContent") {
+                // Try to find JSON object containing transcriptContent
+                let regex = regex::Regex::new(r#""transcriptContent"\s*:\s*\{[^}]*\}"#)
+                    .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
+                
+                if let Some(captures) = regex.find(&script_text) {
+                    // Try to extract a larger JSON context
+                    let start = captures.start().saturating_sub(100);
+                    let end = (captures.end() + 1000).min(script_text.len());
+                    let json_candidate = &script_text[start..end];
+                    
+                    // Find the opening brace before transcriptContent
+                    if let Some(brace_pos) = json_candidate.rfind('{') {
+                        let json_str = &json_candidate[brace_pos..];
+                        if let Ok(parsed) = extract_json_object(json_str) {
+                            if parsed.get("transcriptContent").is_some() {
+                                debug!("Found transcript data via transcriptContent pattern");
+                                return Ok(parsed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: Try to parse transcript from DOM structure
+    // Look for common transcript container selectors
+    let transcript_selectors = vec![
+        "div[data-module='Transcript']",
+        "div.transcript",
+        "div#transcript",
+        "section[data-testid='transcript']",
+    ];
+
+    for selector_str in transcript_selectors {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            if document.select(&selector).next().is_some() {
+                debug!("Found transcript container with selector: {}", selector_str);
+                // Extract transcript from DOM
+                return extract_transcript_from_dom(&document, selector_str);
+            }
+        }
+    }
+
+    // If no structured data found, try to extract from common patterns
+    warn!("Could not find structured transcript data, attempting generic extraction");
+    extract_transcript_from_dom_generic(&document)
+}
+
+fn extract_transcript_from_dom(
+    document: &Html,
+    container_selector: &str,
+) -> Result<Value, YahooError> {
+    // This is a placeholder - actual implementation would parse the DOM
+    // For now, return a structure that matches what parse_transcript expects
+    let container_sel = Selector::parse(container_selector)
+        .map_err(|e| YahooError::ParseError(format!("Failed to parse container selector: {}", e)))?;
+    
+    let mut paragraphs = Vec::new();
+    let mut speakers = Vec::new();
+    let mut speaker_mapping = std::collections::HashMap::new();
+
+    // Try to find speaker elements and transcript paragraphs
+    let speaker_selector = Selector::parse("div[class*='speaker'], span[class*='speaker'], strong")
+        .map_err(|e| YahooError::ParseError(format!("Failed to parse speaker selector: {}", e)))?;
+    
+    let text_selector = Selector::parse("p, div[class*='text'], div[class*='paragraph']")
+        .map_err(|e| YahooError::ParseError(format!("Failed to parse text selector: {}", e)))?;
+
+    if let Some(container) = document.select(&container_sel).next() {
+        let mut current_speaker = "Unknown".to_string();
+        
+        for element in container.select(&text_selector) {
+            let text = element.text().collect::<String>().trim().to_string();
+            if !text.is_empty() {
+                // Check if this element contains a speaker name
+                if let Some(speaker_elem) = element.select(&speaker_selector).next() {
+                    let speaker_name = speaker_elem.text().collect::<String>().trim().to_string();
+                    if !speaker_name.is_empty() {
+                        current_speaker = speaker_name.clone();
+                        if !speaker_mapping.contains_key(&current_speaker) {
+                            let speaker_id = format!("speaker_{}", speakers.len());
+                            speaker_mapping.insert(current_speaker.clone(), speaker_id.clone());
+                            speakers.push(serde_json::json!({
+                                "speaker": speaker_id,
+                                "speaker_data": {
+                                    "name": current_speaker,
+                                    "role": None::<String>,
+                                    "company": None::<String>
+                                }
+                            }));
+                        }
+                    }
+                }
+                
+                paragraphs.push(serde_json::json!({
+                    "speaker": speaker_mapping.get(&current_speaker).cloned().unwrap_or_else(|| "unknown".to_string()),
+                    "text": text
+                }));
+            }
+        }
+    }
+
+    // Build response structure matching API format
+    Ok(serde_json::json!({
+        "transcriptContent": {
+            "speaker_mapping": speakers,
+            "transcript": {
+                "paragraphs": paragraphs
+            }
+        },
+        "transcriptMetadata": {
+            "fiscalYear": None::<i32>,
+            "fiscalPeriod": None::<String>,
+            "title": None::<String>,
+            "date": None::<i64>,
+            "eventType": "Earnings Call",
+            "isLatest": false
+        }
+    }))
+}
+
+fn extract_transcript_from_dom_generic(document: &Html) -> Result<Value, YahooError> {
+    // Generic extraction - look for any text content that might be transcript
+    let mut paragraphs = Vec::new();
+    let mut speakers = Vec::new();
+    
+    // Try to find any content that looks like a transcript
+    let content_selectors = vec![
+        "div[class*='transcript']",
+        "div[class*='earnings']",
+        "article",
+        "main",
+    ];
+
+    for selector_str in content_selectors {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            for container in document.select(&selector) {
+                let text = container.text().collect::<String>();
+                if text.len() > 1000 {  // Likely a transcript if it's long
+                    // Split by common patterns (speaker names, timestamps, etc.)
+                    let lines: Vec<&str> = text.lines().collect();
+                    let mut current_speaker = "Unknown".to_string();
+                    
+                    for line in lines {
+                        let trimmed = line.trim();
+                        if trimmed.is_empty() {
+                            continue;
+                        }
+                        
+                        // Check if line looks like a speaker name (short, possibly in caps or bold)
+                        if trimmed.len() < 50 && (trimmed.chars().all(|c| c.is_uppercase() || c.is_whitespace() || c == ':') || trimmed.ends_with(':')) {
+                            current_speaker = trimmed.trim_end_matches(':').trim().to_string();
+                            if !speakers.iter().any(|s: &Value| s.get("speaker_data").and_then(|sd| sd.get("name")).and_then(|n| n.as_str()) == Some(&current_speaker)) {
+                                let speaker_id = format!("speaker_{}", speakers.len());
+                                speakers.push(serde_json::json!({
+                                    "speaker": speaker_id,
+                                    "speaker_data": {
+                                        "name": current_speaker.clone(),
+                                        "role": None::<String>,
+                                        "company": None::<String>
+                                    }
+                                }));
+                            }
+                        } else if trimmed.len() > 20 {
+                            // Likely transcript text
+                            // Find or create speaker ID for current_speaker
+                            let speaker_id = if speakers.is_empty() {
+                                // Create a default speaker if none exists
+                                let default_id = "speaker_0".to_string();
+                                speakers.push(serde_json::json!({
+                                    "speaker": default_id.clone(),
+                                    "speaker_data": {
+                                        "name": current_speaker.clone(),
+                                        "role": None::<String>,
+                                        "company": None::<String>
+                                    }
+                                }));
+                                default_id
+                            } else {
+                                // Find existing speaker or use the last one
+                                speakers.iter()
+                                    .find(|s| {
+                                        s.get("speaker_data")
+                                            .and_then(|sd| sd.get("name"))
+                                            .and_then(|n| n.as_str())
+                                            .map(|n| n == current_speaker)
+                                            .unwrap_or(false)
+                                    })
+                                    .and_then(|s| s.get("speaker").and_then(|id| id.as_str()))
+                                    .map(|s| s.to_string())
+                                    .unwrap_or_else(|| {
+                                        format!("speaker_{}", speakers.len() - 1)
+                                    })
+                            };
+                            
+                            paragraphs.push(serde_json::json!({
+                                "speaker": speaker_id,
+                                "text": trimmed
+                            }));
+                        }
+                    }
+                    
+                    if !paragraphs.is_empty() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Build response structure
+    Ok(serde_json::json!({
+        "transcriptContent": {
+            "speaker_mapping": speakers,
+            "transcript": {
+                "paragraphs": paragraphs
+            }
+        },
+        "transcriptMetadata": {
+            "fiscalYear": None::<i32>,
+            "fiscalPeriod": None::<String>,
+            "title": None::<String>,
+            "date": None::<i64>,
+            "eventType": "Earnings Call",
+            "isLatest": false
+        }
+    }))
 }

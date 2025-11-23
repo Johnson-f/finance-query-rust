@@ -78,14 +78,14 @@ pub async fn get_earnings_calls_list(
 }
 
 pub async fn get_earnings_transcript(
-    yahoo_client: &YahooFinanceClient,
+    _yahoo_client: &YahooFinanceClient,
     fetch_client: &Arc<FetchClient>,
     symbol: &str,
     quarter: Option<String>,
     year: Option<i32>,
 ) -> Result<EarningsTranscript, YahooError> {
     // Get list of available earnings calls
-    let calls_list = get_earnings_calls_list(yahoo_client, fetch_client, symbol).await?;
+    let calls_list = get_earnings_calls_list(_yahoo_client, fetch_client, symbol).await?;
 
     if calls_list.earnings_calls.is_empty() {
         return Err(YahooError::NotFound(format!(
@@ -125,34 +125,9 @@ pub async fn get_earnings_transcript(
         &calls_list.earnings_calls[0]
     };
 
-    // Get company ID (quartrId)
-    let quote_type_data = yahoo_client.get_quote_type(symbol).await?;
-    let quote_type_result = quote_type_data
-        .get("quoteType")
-        .and_then(|qt| qt.get("result"))
-        .and_then(|r| r.as_array())
-        .ok_or_else(|| {
-            YahooError::ParseError(format!("Could not find company ID for {}", symbol))
-        })?;
-
-    if quote_type_result.is_empty() {
-        return Err(YahooError::ParseError(format!(
-            "Could not find company ID for {}",
-            symbol
-        )));
-    }
-
-    let company_id = quote_type_result[0]
-        .get("quartrId")
-        .and_then(|id| id.as_str())
-        .ok_or_else(|| {
-            YahooError::ParseError(format!("No company ID (quartrId) found for {}", symbol))
-        })?;
-
-    // Fetch the transcript
-    let transcript_data = yahoo_client
-        .get_earnings_transcript(&target_call.event_id, company_id)
-        .await?;
+    // Scrape the transcript from the URL
+    debug!("Scraping transcript from URL: {}", target_call.url);
+    let transcript_data = scraper::scrape_earnings_transcript_from_url(fetch_client, &target_call.url).await?;
 
     // Parse the transcript
     parse_transcript(symbol, &transcript_data, target_call)
