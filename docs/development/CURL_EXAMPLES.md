@@ -43,7 +43,7 @@ Get historical price data for a symbol with time range and interval.
 
 **Time Ranges:** `1d`, `5d`, `1mo`, `3mo`, `6mo`, `1y`, `2y`, `5y`, `10y`, `ytd`, `max`
 
-**Intervals:** `1m`, `5m`, `15m`, `30m`, `1h`, `1d`, `1wk`, `1mo`
+**Intervals:** `1m`, `3m`, `5m`, `10m`, `15m`, `20m`, `30m`, `65m`, `95m`, `1h`, `1d`, `1wk`, `1mo`
 
 ```bash
 # Daily data for 1 year

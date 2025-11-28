@@ -52,8 +52,8 @@ struct MAPoint {
 
 /// Parse timeframe string and return (Interval, TimeRange)
 /// Examples:
-/// - "1wk" -> (Interval::Weekly, TimeRange::TenYears)
-/// - "1d" -> (Interval::Daily, TimeRange::TenYears)
+/// - "1wk" -> (Interval::Weekly, TimeRange::Max)
+/// - "1d" -> (Interval::Daily, TimeRange::Max)
 /// - "1d & 1m" -> (Interval::OneMinute, TimeRange::Day)
 /// - "1d & 5m" -> (Interval::FiveMinutes, TimeRange::Day)
 fn parse_timeframe(timeframe: &str) -> (Interval, TimeRange) {
@@ -67,9 +67,14 @@ fn parse_timeframe(timeframe: &str) -> (Interval, TimeRange) {
             let interval_str = parts[1].trim();
             let interval = match interval_str {
                 "1m" => Interval::OneMinute,
+                "3m" => Interval::ThreeMinutes,
                 "5m" => Interval::FiveMinutes,
+                "10m" => Interval::TenMinutes,
                 "15m" => Interval::FifteenMinutes,
+                "20m" => Interval::TwentyMinutes,
                 "30m" => Interval::ThirtyMinutes,
+                "65m" => Interval::SixtyFiveMinutes,
+                "95m" => Interval::NinetyFiveMinutes,
                 "1h" => Interval::OneHour,
                 _ => {
                     warn!("Unknown intraday interval: {}, defaulting to 1m", interval_str);
@@ -82,11 +87,11 @@ fn parse_timeframe(timeframe: &str) -> (Interval, TimeRange) {
     
     // Daily or weekly intervals
     match timeframe_lower {
-        "1d" => (Interval::Daily, TimeRange::TenYears),
-        "1wk" => (Interval::Weekly, TimeRange::TenYears),
+        "1d" => (Interval::Daily, TimeRange::Max),
+        "1wk" => (Interval::Weekly, TimeRange::Max),
         _ => {
             warn!("Unknown timeframe: {}, defaulting to 1d", timeframe);
-            (Interval::Daily, TimeRange::TenYears)
+            (Interval::Daily, TimeRange::Max)
         }
     }
 }
@@ -366,11 +371,20 @@ async fn initialize_buffers(
         match get_historical(yahoo_client.as_ref(), &symbol, time_range, interval).await {
             Ok(historical) => {
                 // Convert historical data to PricePoint vector
+                // Timestamps are stored as RFC3339 strings, need to parse them
                 let mut prices: Vec<PricePoint> = historical.data.iter()
                     .filter_map(|(ts_str, data)| {
-                        ts_str.parse::<i64>().ok().map(|timestamp| PricePoint {
+                        // Try parsing as RFC3339 first, then fallback to Unix timestamp string
+                        let timestamp = chrono::DateTime::parse_from_rfc3339(ts_str)
+                            .map(|dt| dt.timestamp())
+                            .ok()
+                            .or_else(|| {
+                                ts_str.parse::<i64>().ok()
+                            });
+                        
+                        timestamp.map(|ts| PricePoint {
                             price: data.close,
-                            timestamp,
+                            timestamp: ts,
                         })
                     })
                     .collect();
@@ -448,4 +462,3 @@ async fn calculate_all_mas(
     
     Ok(results)
 }
-

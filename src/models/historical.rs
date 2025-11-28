@@ -1,4 +1,28 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IndicatorType {
+    SMA,
+    EMA,
+}
+
+impl IndicatorType {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "sma" => Some(IndicatorType::SMA),
+            "ema" => Some(IndicatorType::EMA),
+            _ => None,
+        }
+    }
+    
+    pub fn parse_list(s: &str) -> HashSet<Self> {
+        s.split(',')
+            .map(|s| s.trim())
+            .filter_map(|s| IndicatorType::from_str(s))
+            .collect()
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,12 +74,22 @@ impl TimeRange {
 pub enum Interval {
     #[serde(rename = "1m")]
     OneMinute,
+    #[serde(rename = "3m")]
+    ThreeMinutes,
     #[serde(rename = "5m")]
     FiveMinutes,
+    #[serde(rename = "10m")]
+    TenMinutes,
     #[serde(rename = "15m")]
     FifteenMinutes,
+    #[serde(rename = "20m")]
+    TwentyMinutes,
     #[serde(rename = "30m")]
     ThirtyMinutes,
+    #[serde(rename = "65m")]
+    SixtyFiveMinutes,
+    #[serde(rename = "95m")]
+    NinetyFiveMinutes,
     #[serde(rename = "1h")]
     OneHour,
     #[serde(rename = "1d")]
@@ -70,9 +104,14 @@ impl Interval {
     pub fn as_str(&self) -> &'static str {
         match self {
             Interval::OneMinute => "1m",
+            Interval::ThreeMinutes => "3m",
             Interval::FiveMinutes => "5m",
+            Interval::TenMinutes => "10m",
             Interval::FifteenMinutes => "15m",
+            Interval::TwentyMinutes => "20m",
             Interval::ThirtyMinutes => "30m",
+            Interval::SixtyFiveMinutes => "65m",
+            Interval::NinetyFiveMinutes => "95m",
             Interval::OneHour => "1h",
             Interval::Daily => "1d",
             Interval::Weekly => "1wk",
@@ -91,6 +130,10 @@ pub struct HistoricalData {
     pub volume: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adj_close: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sma: Option<std::collections::HashMap<String, f64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ema: Option<std::collections::HashMap<String, f64>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
