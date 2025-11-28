@@ -1,17 +1,18 @@
 mod client;
+mod graphql;
 mod middleware;
 mod models;
 mod routes;
 mod service;
 mod utils;
 
-use actix::Actor;
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
+use async_graphql::{EmptyMutation, Schema};
 use client::{FetchClient, YahooAuthManager, YahooFinanceClient};
+use graphql::{AppContext, Query, Subscription};
 use middleware::rate_limit::RateLimitManager;
 use service::caching::CacheService;
-use service::websocket::ConnectionManager;
 use service::websocket::indicator::price_buffer::PriceBufferManager;
 use std::sync::Arc;
 use tracing::info;
@@ -21,7 +22,6 @@ pub struct AppState {
     pub yahoo_auth_manager: Arc<YahooAuthManager>,
     pub fetch_client: Arc<FetchClient>,
     pub yahoo_client: Arc<YahooFinanceClient>,
-    pub connection_manager: web::Data<service::websocket::ConnectionManagerAddr>,
     pub cache_service: Arc<CacheService>,
     pub rate_limit_manager: Arc<RateLimitManager>,
     pub price_buffer_manager: Arc<PriceBufferManager>,
@@ -67,10 +67,6 @@ async fn main() -> std::io::Result<()> {
         fetch_client.clone(),
     ));
 
-    // Initialize WebSocket connection manager
-    let connection_manager = ConnectionManager::default().start();
-    let connection_manager_data = web::Data::new(connection_manager);
-
     // Initialize Redis cache service
     let redis_url = std::env::var("REDIS_URL").ok();
     let cache_service = Arc::new(CacheService::new(redis_url.clone()).await);
@@ -98,11 +94,18 @@ async fn main() -> std::io::Result<()> {
         yahoo_auth_manager,
         fetch_client,
         yahoo_client,
-        connection_manager: connection_manager_data.clone(),
         cache_service,
         rate_limit_manager: rate_limit_manager.clone(),
         price_buffer_manager,
     });
+
+    // Create GraphQL schema
+    let schema = Schema::build(Query, EmptyMutation, Subscription)
+        .data(AppContext {
+            app_state: app_state.clone(),
+        })
+        .finish();
+    let schema_data = web::Data::new(schema);
 
     info!("Starting HTTP server on 0.0.0.0:8080");
 
@@ -116,10 +119,13 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .app_data(app_state.clone())
-            .app_data(connection_manager_data.clone())
+            .app_data(schema_data.clone())
             .wrap(cors)
             .wrap(TracingLogger::default())
             .wrap(middleware::rate_limit::RateLimitMiddleware::new(rate_limit_manager.clone()))
+            .route("/graphql", web::post().to(graphql::handlers::graphql_handler))
+            .route("/graphql", web::get().to(graphql::handlers::graphql_ws_handler))
+            .route("/graphql-playground", web::get().to(graphql::handlers::graphql_playground))
             .configure(routes::configure_routes)
     })
     .bind("0.0.0.0:8080")?

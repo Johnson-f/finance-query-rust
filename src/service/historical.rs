@@ -501,14 +501,6 @@ pub fn calculate_indicators(
     // Sort by timestamp (oldest first)
     price_points.sort_by_key(|p| p.timestamp);
     
-    // Find the maximum period to check if we have enough data
-    let max_period = periods.iter().max().copied().unwrap_or(20);
-    
-    if price_points.len() < max_period {
-        // Not enough data for indicators, return original data
-        return historical;
-    }
-    
     // Calculate indicators for each period
     // Structure: HashMap<period_string, HashMap<timestamp, value>>
     let mut sma_maps: HashMap<String, HashMap<i64, f64>> = HashMap::new();
@@ -516,6 +508,11 @@ pub fn calculate_indicators(
     
     for &period in periods {
         let period_str = period.to_string();
+        
+        // Skip this period if we don't have enough data points
+        if price_points.len() < period {
+            continue; // Skip this period, but continue with others
+        }
         
         if requested_indicators.contains(&IndicatorType::SMA) {
             let sma_series = calculate_ma_series(&price_points, MovingAverageType::SMA, period);
