@@ -580,4 +580,3 @@ pub fn calculate_indicators(
     
     HistoricalResponse { data: new_data }
 }
-
