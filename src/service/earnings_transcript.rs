@@ -95,7 +95,7 @@ pub async fn get_earnings_transcript(
     }
 
     // Filter by quarter/year if specified, otherwise use most recent call
-    let target_call = if let (Some(ref q), Some(y)) = (quarter.as_ref(), year) {
+    let target_call = if let (Some(q), Some(y)) = (quarter.as_ref(), year) {
         // Normalize quarter format
         let normalized_quarter = if q.starts_with("Q") || q.starts_with("q") {
             q.to_uppercase()

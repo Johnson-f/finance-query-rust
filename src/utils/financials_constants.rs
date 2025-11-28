@@ -1,6 +1,5 @@
 /// Constants for Yahoo Finance fundamentals-timeseries API.
 /// These field names correspond to the 'type' parameter in the Yahoo Finance API.
-
 pub const INCOME_STATEMENT_FIELDS: &[&str] = &[
     "TotalRevenue",
     "OperatingRevenue",

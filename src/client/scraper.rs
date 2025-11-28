@@ -62,7 +62,7 @@ fn find_transcript_in_nested_json(value: &Value) -> Option<Value> {
         let mut found = true;
         
         for key in &path {
-            if let Some(index) = key.parse::<usize>().ok() {
+            if let Ok(index) = key.parse::<usize>() {
                 if let Some(arr) = current.as_array() {
                     if let Some(item) = arr.get(index) {
                         current = item;
@@ -225,49 +225,49 @@ pub async fn scrape_earnings_calls_list(
     let mut seen_event_ids = std::collections::HashSet::new();
 
     for href in earnings_links {
-        if let Some(captures) = event_id_regex.captures(&href) {
-            if let Some(event_id_match) = captures.get(1) {
-                let event_id = event_id_match.as_str();
+        if let Some(captures) = event_id_regex.captures(&href)
+            && let Some(event_id_match) = captures.get(1)
+        {
+            let event_id = event_id_match.as_str();
 
-                // Skip duplicates
-                if seen_event_ids.contains(event_id) {
-                    continue;
-                }
-                seen_event_ids.insert(event_id.to_string());
-
-                // Extract quarter and year (matching Python implementation)
-                let quarter = quarter_year_regex
-                    .captures(&href)
-                    .and_then(|c| c.get(1))
-                    .map(|m| m.as_str().to_uppercase());
-                let year = quarter_year_regex
-                    .captures(&href)
-                    .and_then(|c| c.get(2))
-                    .and_then(|m| m.as_str().parse::<i32>().ok());
-
-                let quarter_clone = quarter.clone();
-                let year_clone = year;
-                let title = if let (Some(ref q), Some(y)) = (quarter, year) {
-                    format!("{} {}", q, y)
-                } else {
-                    "Earnings Call".to_string()
-                };
-
-                // Build URL - handle both absolute and relative URLs
-                let url = if href.starts_with("http") {
-                    href.clone()
-                } else {
-                    format!("https://finance.yahoo.com{}", href)
-                };
-
-                calls.push(serde_json::json!({
-                    "eventId": event_id,
-                    "quarter": quarter_clone,
-                    "year": year_clone,
-                    "title": title,
-                    "url": url,
-                }));
+            // Skip duplicates
+            if seen_event_ids.contains(event_id) {
+                continue;
             }
+            seen_event_ids.insert(event_id.to_string());
+
+            // Extract quarter and year (matching Python implementation)
+            let quarter = quarter_year_regex
+                .captures(&href)
+                .and_then(|c| c.get(1))
+                .map(|m| m.as_str().to_uppercase());
+            let year = quarter_year_regex
+                .captures(&href)
+                .and_then(|c| c.get(2))
+                .and_then(|m| m.as_str().parse::<i32>().ok());
+
+            let quarter_clone = quarter.clone();
+            let year_clone = year;
+            let title = if let (Some(ref q), Some(y)) = (quarter, year) {
+                format!("{} {}", q, y)
+            } else {
+                "Earnings Call".to_string()
+            };
+
+            // Build URL - handle both absolute and relative URLs
+            let url = if href.starts_with("http") {
+                href.clone()
+            } else {
+                format!("https://finance.yahoo.com{}", href)
+            };
+
+            calls.push(serde_json::json!({
+                "eventId": event_id,
+                "quarter": quarter_clone,
+                "year": year_clone,
+                "title": title,
+                "url": url,
+            }));
         }
     }
 
@@ -303,6 +303,10 @@ pub async fn scrape_earnings_transcript_from_url(
     let script_selector = Selector::parse("script")
         .map_err(|e| YahooError::ParseError(format!("Failed to parse script selector: {}", e)))?;
     
+    // Pre-compile regex outside the loop for Strategy 2
+    let transcript_content_regex = regex::Regex::new(r#""transcriptContent"\s*:\s*\{[^}]*\}"#)
+        .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
+    
     // Look for script tags containing transcript data
     for script in document.select(&script_selector) {
         let script_text: String = script.text().collect();
@@ -312,20 +316,20 @@ pub async fn scrape_earnings_transcript_from_url(
             // Try multiple extraction strategies
             
             // Strategy 1: Look for root.App.main pattern
-            if script_text.contains("root.App.main") {
-                if let Some(start) = script_text.find("root.App.main") {
-                    let after_main = &script_text[start..];
-                    // Find the assignment
-                    if let Some(assign_pos) = after_main.find('=') {
-                        let json_start = &after_main[assign_pos + 1..].trim_start();
-                        if let Some(brace_start) = json_start.find('{') {
-                            let json_str = &json_start[brace_start..];
-                            if let Ok(parsed) = extract_json_object(json_str) {
-                                // Navigate through the structure: root.App.main[0][3][1][0]
-                                if let Some(transcript_data) = find_transcript_in_nested_json(&parsed) {
-                                    debug!("Found transcript data in root.App.main");
-                                    return Ok(transcript_data);
-                                }
+            if script_text.contains("root.App.main")
+                && let Some(start) = script_text.find("root.App.main")
+            {
+                let after_main = &script_text[start..];
+                // Find the assignment
+                if let Some(assign_pos) = after_main.find('=') {
+                    let json_start = &after_main[assign_pos + 1..].trim_start();
+                    if let Some(brace_start) = json_start.find('{') {
+                        let json_str = &json_start[brace_start..];
+                        if let Ok(parsed) = extract_json_object(json_str) {
+                            // Navigate through the structure: root.App.main[0][3][1][0]
+                            if let Some(transcript_data) = find_transcript_in_nested_json(&parsed) {
+                                debug!("Found transcript data in root.App.main");
+                                return Ok(transcript_data);
                             }
                         }
                     }
@@ -333,26 +337,22 @@ pub async fn scrape_earnings_transcript_from_url(
             }
             
             // Strategy 2: Direct transcriptContent pattern
-            if script_text.contains("transcriptContent") {
-                // Try to find JSON object containing transcriptContent
-                let regex = regex::Regex::new(r#""transcriptContent"\s*:\s*\{[^}]*\}"#)
-                    .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
+            if script_text.contains("transcriptContent")
+                && let Some(captures) = transcript_content_regex.find(&script_text)
+            {
+                // Try to extract a larger JSON context
+                let start = captures.start().saturating_sub(100);
+                let end = (captures.end() + 1000).min(script_text.len());
+                let json_candidate = &script_text[start..end];
                 
-                if let Some(captures) = regex.find(&script_text) {
-                    // Try to extract a larger JSON context
-                    let start = captures.start().saturating_sub(100);
-                    let end = (captures.end() + 1000).min(script_text.len());
-                    let json_candidate = &script_text[start..end];
-                    
-                    // Find the opening brace before transcriptContent
-                    if let Some(brace_pos) = json_candidate.rfind('{') {
-                        let json_str = &json_candidate[brace_pos..];
-                        if let Ok(parsed) = extract_json_object(json_str) {
-                            if parsed.get("transcriptContent").is_some() {
-                                debug!("Found transcript data via transcriptContent pattern");
-                                return Ok(parsed);
-                            }
-                        }
+                // Find the opening brace before transcriptContent
+                if let Some(brace_pos) = json_candidate.rfind('{') {
+                    let json_str = &json_candidate[brace_pos..];
+                    if let Ok(parsed) = extract_json_object(json_str)
+                        && parsed.get("transcriptContent").is_some()
+                    {
+                        debug!("Found transcript data via transcriptContent pattern");
+                        return Ok(parsed);
                     }
                 }
             }
@@ -369,12 +369,12 @@ pub async fn scrape_earnings_transcript_from_url(
     ];
 
     for selector_str in transcript_selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            if document.select(&selector).next().is_some() {
-                debug!("Found transcript container with selector: {}", selector_str);
-                // Extract transcript from DOM
-                return extract_transcript_from_dom(&document, selector_str);
-            }
+        if let Ok(selector) = Selector::parse(selector_str)
+            && document.select(&selector).next().is_some()
+        {
+            debug!("Found transcript container with selector: {}", selector_str);
+            // Extract transcript from DOM
+            return extract_transcript_from_dom(&document, selector_str);
         }
     }
 

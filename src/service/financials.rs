@@ -28,7 +28,7 @@ fn parse_timeseries_data(timeseries_result: &[Value]) -> HashMap<String, HashMap
             .get("meta")
             .and_then(|m| m.get("type"))
             .and_then(|t| t.as_array())
-            .and_then(|arr| arr.get(0))
+            .and_then(|arr| arr.first())
             .and_then(|v| v.as_str())
             .unwrap_or("");
 

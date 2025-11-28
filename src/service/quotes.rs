@@ -30,12 +30,12 @@ pub async fn get_quotes(
                         error!("Failed to parse quoteSummary for {}: {}", symbol, e);
                         // Try fallback to scraping
                         warn!("Falling back to scraping for {}", symbol);
-                        if let Ok(quote_data) = scraper::scrape_quote(fetch_client, symbol).await {
-                            if let Ok(mut quote) = parse_quote_from_scraped(quote_data) {
-                                // Fetch logo for scraped quote
-                                quote.logo = logo::get_logo(fetch_client, Some(symbol), None).await;
-                                quotes.push(quote);
-                            }
+                        if let Ok(quote_data) = scraper::scrape_quote(fetch_client, symbol).await
+                            && let Ok(mut quote) = parse_quote_from_scraped(quote_data)
+                        {
+                            // Fetch logo for scraped quote
+                            quote.logo = logo::get_logo(fetch_client, Some(symbol), None).await;
+                            quotes.push(quote);
                         }
                     }
                 }
@@ -141,10 +141,8 @@ fn get_fmt(data: &Value, key: &str) -> Option<String> {
                     })
             } else if let Some(num) = v.as_f64() {
                 Some(num.to_string())
-            } else if let Some(str_val) = v.as_str() {
-                Some(str_val.to_string())
             } else {
-                None
+                v.as_str().map(|str_val| str_val.to_string())
             }
         })
 }
@@ -167,11 +165,9 @@ fn format_date(date_val: Option<&Value>) -> Option<String> {
     date_val.and_then(|d| {
         if let Some(str_val) = d.as_str() {
             Some(str_val.to_string())
-        } else if let Some(num) = d.as_i64() {
-            // Convert epoch timestamp to date string if needed
-            Some(num.to_string())
         } else {
-            None
+            // Convert epoch timestamp to date string if needed
+            d.as_i64().map(|num| num.to_string())
         }
     })
 }
@@ -185,7 +181,7 @@ async fn parse_quote_from_summary(
         .get("quoteSummary")
         .and_then(|qs| qs.get("result"))
         .and_then(|r| r.as_array())
-        .and_then(|arr| arr.get(0))
+        .and_then(|arr| arr.first())
         .ok_or_else(|| YahooError::ParseError("No quoteSummary result found".to_string()))?;
     
     let price_data = summary_result.get("price").unwrap_or(&Value::Null);
@@ -427,11 +423,9 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
             } else if let Some(num) = p.as_f64() {
                 // Direct number
                 Some(num.to_string())
-            } else if let Some(str_val) = p.as_str() {
-                // Direct string
-                Some(str_val.to_string())
             } else {
-                None
+                // Direct string
+                p.as_str().map(|str_val| str_val.to_string())
             }
         })
         .unwrap_or_else(|| {
@@ -461,10 +455,8 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
                             .or_else(|| v.as_f64().map(|f| f.to_string())))
                 } else if let Some(num) = p.as_f64() {
                     Some(num.to_string())
-                } else if let Some(str_val) = p.as_str() {
-                    Some(str_val.to_string())
                 } else {
-                    None
+                    p.as_str().map(|str_val| str_val.to_string())
                 }
             }),
         change: result.get("regularMarketChange")
@@ -476,10 +468,8 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
                             .or_else(|| v.as_f64().map(|f| f.to_string())))
                 } else if let Some(num) = c.as_f64() {
                     Some(num.to_string())
-                } else if let Some(str_val) = c.as_str() {
-                    Some(str_val.to_string())
                 } else {
-                    None
+                    c.as_str().map(|str_val| str_val.to_string())
                 }
             })
             .unwrap_or_else(|| "0.0".to_string()),
@@ -492,10 +482,8 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
                             .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f))))
                 } else if let Some(num) = p.as_f64() {
                     Some(format!("{:.2}%", num))
-                } else if let Some(str_val) = p.as_str() {
-                    Some(str_val.to_string())
                 } else {
-                    None
+                    p.as_str().map(|str_val| str_val.to_string())
                 }
             })
             .unwrap_or_else(|| "0.0%".to_string()),
@@ -590,10 +578,8 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
                         .or_else(|| v.as_f64().map(|f| f.to_string())))
             } else if let Some(num) = p.as_f64() {
                 Some(num.to_string())
-            } else if let Some(str_val) = p.as_str() {
-                Some(str_val.to_string())
             } else {
-                None
+                p.as_str().map(|str_val| str_val.to_string())
             }
         })
         .unwrap_or_else(|| {
@@ -618,10 +604,8 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
                             .or_else(|| v.as_f64().map(|f| f.to_string())))
                 } else if let Some(num) = p.as_f64() {
                     Some(num.to_string())
-                } else if let Some(str_val) = p.as_str() {
-                    Some(str_val.to_string())
                 } else {
-                    None
+                    p.as_str().map(|str_val| str_val.to_string())
                 }
             }),
         after_hours_price: result.get("postMarketPrice")
@@ -633,10 +617,8 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
                             .or_else(|| v.as_f64().map(|f| f.to_string())))
                 } else if let Some(num) = p.as_f64() {
                     Some(num.to_string())
-                } else if let Some(str_val) = p.as_str() {
-                    Some(str_val.to_string())
                 } else {
-                    None
+                    p.as_str().map(|str_val| str_val.to_string())
                 }
             }),
         change: result.get("regularMarketChange")
@@ -648,10 +630,8 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
                             .or_else(|| v.as_f64().map(|f| f.to_string())))
                 } else if let Some(num) = c.as_f64() {
                     Some(num.to_string())
-                } else if let Some(str_val) = c.as_str() {
-                    Some(str_val.to_string())
                 } else {
-                    None
+                    c.as_str().map(|str_val| str_val.to_string())
                 }
             })
             .unwrap_or_else(|| "0.0".to_string()),
@@ -664,10 +644,8 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
                             .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f))))
                 } else if let Some(num) = p.as_f64() {
                     Some(format!("{:.2}%", num))
-                } else if let Some(str_val) = p.as_str() {
-                    Some(str_val.to_string())
                 } else {
-                    None
+                    p.as_str().map(|str_val| str_val.to_string())
                 }
             })
             .unwrap_or_else(|| "0.0%".to_string()),
@@ -780,7 +758,7 @@ pub async fn get_similar_quotes(
         .get("finance")
         .and_then(|f| f.get("result"))
         .and_then(|r| r.as_array())
-        .and_then(|arr| arr.get(0))
+        .and_then(|arr| arr.first())
         .and_then(|first| first.get("recommendedSymbols"))
         .and_then(|recs| recs.as_array())
         .map(|recs| {

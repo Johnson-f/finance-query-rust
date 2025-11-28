@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum IndicatorType {
     SMA,
     EMA,
@@ -19,7 +20,7 @@ impl IndicatorType {
     pub fn parse_list(s: &str) -> HashSet<Self> {
         s.split(',')
             .map(|s| s.trim())
-            .filter_map(|s| IndicatorType::from_str(s))
+            .filter_map(IndicatorType::from_str)
             .collect()
     }
 }

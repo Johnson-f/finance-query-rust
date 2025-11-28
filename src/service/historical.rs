@@ -278,13 +278,14 @@ async fn get_historical_max_weekly(
 fn parse_historical_data(data: Value) -> Result<HistoricalResponse, YahooError> {
     let mut history_map = HashMap::new();
 
-    if let Some(chart) = data.get("chart") {
-        if let Some(results) = chart.get("result").and_then(|r| r.as_array()) {
-            if let Some(result) = results.first() {
-                if let Some(timestamps) = result.get("timestamp").and_then(|t| t.as_array()) {
-                    if let Some(indicators) = result.get("indicators") {
-                        if let Some(quote) = indicators.get("quote").and_then(|q| q.as_array()) {
-                            if let Some(quote_data) = quote.first() {
+    if let Some(chart) = data.get("chart")
+        && let Some(results) = chart.get("result").and_then(|r| r.as_array())
+        && let Some(result) = results.first()
+        && let Some(timestamps) = result.get("timestamp").and_then(|t| t.as_array())
+        && let Some(indicators) = result.get("indicators")
+        && let Some(quote) = indicators.get("quote").and_then(|q| q.as_array())
+        && let Some(quote_data) = quote.first()
+    {
                                 let empty_vec = vec![];
                                 let opens = quote_data.get("open").and_then(|o| o.as_array()).unwrap_or(&empty_vec);
                                 let highs = quote_data.get("high").and_then(|h| h.as_array()).unwrap_or(&empty_vec);
@@ -328,12 +329,6 @@ fn parse_historical_data(data: Value) -> Result<HistoricalResponse, YahooError> 
                                         );
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     Ok(HistoricalResponse { data: history_map })
@@ -396,13 +391,13 @@ async fn get_historical_resampled(
             _ => {
                 // New bucket or first bucket
                 // Process previous bucket if exists
-                if let Some(start) = current_bucket_start {
-                    if let Some(aggregated) = aggregate_bucket(&current_bucket) {
-                        let rfc3339_timestamp = chrono::DateTime::from_timestamp(start, 0)
-                            .map(|dt| dt.to_rfc3339())
-                            .unwrap_or_else(|| start.to_string());
-                        resampled.insert(rfc3339_timestamp, aggregated);
-                    }
+                if let Some(start) = current_bucket_start
+                    && let Some(aggregated) = aggregate_bucket(&current_bucket)
+                {
+                    let rfc3339_timestamp = chrono::DateTime::from_timestamp(start, 0)
+                        .map(|dt| dt.to_rfc3339())
+                        .unwrap_or_else(|| start.to_string());
+                    resampled.insert(rfc3339_timestamp, aggregated);
                 }
                 
                 // Start new bucket
@@ -413,13 +408,13 @@ async fn get_historical_resampled(
     }
     
     // Process last bucket
-    if let Some(start) = current_bucket_start {
-        if let Some(aggregated) = aggregate_bucket(&current_bucket) {
-            let rfc3339_timestamp = chrono::DateTime::from_timestamp(start, 0)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_else(|| start.to_string());
-            resampled.insert(rfc3339_timestamp, aggregated);
-        }
+    if let Some(start) = current_bucket_start
+        && let Some(aggregated) = aggregate_bucket(&current_bucket)
+    {
+        let rfc3339_timestamp = chrono::DateTime::from_timestamp(start, 0)
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_else(|| start.to_string());
+        resampled.insert(rfc3339_timestamp, aggregated);
     }
     
     info!("Resampled {} 1m data points to {} {}m intervals", 
@@ -544,10 +539,10 @@ pub fn calculate_indicators(
             if requested_indicators.contains(&IndicatorType::SMA) {
                 let mut sma_values = HashMap::new();
                 for period_str in periods.iter().map(|p| p.to_string()) {
-                    if let Some(sma_map) = sma_maps.get(&period_str) {
-                        if let Some(value) = sma_map.get(&ts) {
-                            sma_values.insert(period_str, *value);
-                        }
+                    if let Some(sma_map) = sma_maps.get(&period_str)
+                        && let Some(value) = sma_map.get(&ts)
+                    {
+                        sma_values.insert(period_str, *value);
                     }
                 }
                 data.sma = if sma_values.is_empty() { None } else { Some(sma_values) };
@@ -559,10 +554,10 @@ pub fn calculate_indicators(
             if requested_indicators.contains(&IndicatorType::EMA) {
                 let mut ema_values = HashMap::new();
                 for period_str in periods.iter().map(|p| p.to_string()) {
-                    if let Some(ema_map) = ema_maps.get(&period_str) {
-                        if let Some(value) = ema_map.get(&ts) {
-                            ema_values.insert(period_str, *value);
-                        }
+                    if let Some(ema_map) = ema_maps.get(&period_str)
+                        && let Some(value) = ema_map.get(&ts)
+                    {
+                        ema_values.insert(period_str, *value);
                     }
                 }
                 data.ema = if ema_values.is_empty() { None } else { Some(ema_values) };

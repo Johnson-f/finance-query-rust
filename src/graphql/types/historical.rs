@@ -141,6 +141,7 @@ impl From<Interval> for IntervalModel {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum IndicatorType {
     #[graphql(name = "sma")]
     SMA,

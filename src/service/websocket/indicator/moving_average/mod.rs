@@ -4,6 +4,7 @@ pub mod sma;
 pub mod ema;
 
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum MovingAverageType {
     SMA,
     EMA,

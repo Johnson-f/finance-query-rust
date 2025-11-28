@@ -76,7 +76,7 @@ impl Query {
         .await
         .map_err(|e| Error::new(e.to_string()))?;
         Ok(quotes.into_iter()
-            .map(|q| crate::models::quote::DetailedQuote::from(q))
+            .map(crate::models::quote::DetailedQuote::from)
             .map(DetailedQuote::from)
             .collect())
     }
@@ -145,7 +145,7 @@ impl Query {
                 return Err(Error::new("Invalid indicator type. Supported: sma, ema"));
             }
             
-            let periods_str = period.as_ref().map(|s| s.as_str()).unwrap_or("20");
+            let periods_str = period.as_deref().unwrap_or("20");
             let periods = parse_periods(periods_str)?;
             
             if periods.is_empty() {
@@ -713,7 +713,7 @@ impl Subscription {
         let interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
         
         interval_stream.then(move |_| {
-            let context_clone = context.clone();
+            let context_clone = context;
             let symbol_clone = symbol_upper.clone();
             
             async move {
@@ -767,7 +767,7 @@ impl Subscription {
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
         
         stream! {
-            while let Some(_) = interval_stream.next().await {
+            while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();
@@ -802,7 +802,7 @@ impl Subscription {
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
         
         stream! {
-            while let Some(_) = interval_stream.next().await {
+            while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();
@@ -839,7 +839,7 @@ impl Subscription {
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
         
         stream! {
-            while let Some(_) = interval_stream.next().await {
+            while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let fetch = ctx.app_state.fetch_client.clone();
                     
@@ -872,7 +872,7 @@ impl Subscription {
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
         
         stream! {
-            while let Some(_) = interval_stream.next().await {
+            while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let fetch = ctx.app_state.fetch_client.clone();
                     
@@ -905,7 +905,7 @@ impl Subscription {
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
         
         stream! {
-            while let Some(_) = interval_stream.next().await {
+            while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     
@@ -961,7 +961,7 @@ impl Subscription {
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
         
         stream! {
-            while let Some(_) = interval_stream.next().await {
+            while (interval_stream.next().await).is_some() {
                 let (status, reason) = market_schedule.get_market_status();
                 yield Ok(MarketHours {
                     status: status.as_str().to_string(),
@@ -1000,7 +1000,7 @@ impl Subscription {
                 }
             };
             
-            while let Some(_) = interval_stream.next().await {
+            while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();

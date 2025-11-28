@@ -280,20 +280,20 @@ where
 
 fn extract_client_ip(req: &ServiceRequest) -> String {
     // Check X-Forwarded-For header first (for proxies/load balancers)
-    if let Some(forwarded_for) = req.headers().get("x-forwarded-for") {
-        if let Ok(forwarded_str) = forwarded_for.to_str() {
-            // X-Forwarded-For can contain multiple IPs, take the first one
-            if let Some(first_ip) = forwarded_str.split(',').next() {
-                return first_ip.trim().to_string();
-            }
+    if let Some(forwarded_for) = req.headers().get("x-forwarded-for")
+        && let Ok(forwarded_str) = forwarded_for.to_str()
+    {
+        // X-Forwarded-For can contain multiple IPs, take the first one
+        if let Some(first_ip) = forwarded_str.split(',').next() {
+            return first_ip.trim().to_string();
         }
     }
 
     // Check X-Real-IP header (alternative proxy header)
-    if let Some(real_ip) = req.headers().get("x-real-ip") {
-        if let Ok(real_ip_str) = real_ip.to_str() {
-            return real_ip_str.to_string();
-        }
+    if let Some(real_ip) = req.headers().get("x-real-ip")
+        && let Ok(real_ip_str) = real_ip.to_str()
+    {
+        return real_ip_str.to_string();
     }
 
     // Fall back to connection info

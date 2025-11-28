@@ -67,31 +67,30 @@ pub async fn get_logo(
     }
 
     // Fall back to domain-based lookup if website URL is provided
-    if let Some(url_str) = website_url {
-        if let Ok(parsed_url) = Url::parse(url_str) {
-            if let Some(domain) = parsed_url.domain() {
-                // Remove www. prefix if present
-                let domain = domain.strip_prefix("www.").unwrap_or(domain);
-                let domain_url = format!(
-                    "https://img.logo.dev/{}?token={}&retina=true",
-                    domain, LOGO_DEV_TOKEN
-                );
+    if let Some(url_str) = website_url
+        && let Ok(parsed_url) = Url::parse(url_str)
+        && let Some(domain) = parsed_url.domain()
+    {
+        // Remove www. prefix if present
+        let domain = domain.strip_prefix("www.").unwrap_or(domain);
+        let domain_url = format!(
+            "https://img.logo.dev/{}?token={}&retina=true",
+            domain, LOGO_DEV_TOKEN
+        );
 
-                match tokio::time::timeout(timeout, fetch_logo_url(fetch_client, &domain_url)).await {
-                    Ok(Ok(Some(logo_url))) => {
-                        debug!("Successfully fetched logo for domain {}: {}", domain, logo_url);
-                        return Some(logo_url);
-                    }
-                    Ok(Ok(None)) => {
-                        debug!("Logo fetch returned None for domain {}", domain);
-                    }
-                    Ok(Err(e)) => {
-                        debug!("Logo fetch failed for domain {}: {}", domain, e);
-                    }
-                    Err(_) => {
-                        warn!("Logo fetch timeout for domain {} after {}s", domain, timeout_secs);
-                    }
-                }
+        match tokio::time::timeout(timeout, fetch_logo_url(fetch_client, &domain_url)).await {
+            Ok(Ok(Some(logo_url))) => {
+                debug!("Successfully fetched logo for domain {}: {}", domain, logo_url);
+                return Some(logo_url);
+            }
+            Ok(Ok(None)) => {
+                debug!("Logo fetch returned None for domain {}", domain);
+            }
+            Ok(Err(e)) => {
+                debug!("Logo fetch failed for domain {}: {}", domain, e);
+            }
+            Err(_) => {
+                warn!("Logo fetch timeout for domain {} after {}s", domain, timeout_secs);
             }
         }
     }

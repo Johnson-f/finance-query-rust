@@ -41,7 +41,7 @@ async fn fetch_movers(
         .get("finance")
         .and_then(|f| f.get("result"))
         .and_then(|r| r.as_array())
-        .and_then(|arr| arr.get(0))
+        .and_then(|arr| arr.first())
         .and_then(|first| first.get("quotes"))
         .and_then(|q| q.as_array())
         .ok_or_else(|| {
@@ -99,10 +99,8 @@ fn get_fmt(data: &Value, key: &str) -> Option<String> {
                     })
             } else if let Some(num) = v.as_f64() {
                 Some(num.to_string())
-            } else if let Some(str_val) = v.as_str() {
-                Some(str_val.to_string())
             } else {
-                None
+                v.as_str().map(|str_val| str_val.to_string())
             }
         })
 }

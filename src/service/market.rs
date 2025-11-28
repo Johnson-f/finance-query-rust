@@ -50,8 +50,7 @@ impl MarketSchedule {
         let first_weekday = first_day.weekday();
         
         let days_until = (weekday.number_from_monday() as i32 - first_weekday.number_from_monday() as i32 + 7) % 7;
-        let target_day = first_day + chrono::Duration::days(days_until as i64 + ((n - 1) * 7) as i64);
-        target_day
+        first_day + chrono::Duration::days(days_until as i64 + ((n - 1) * 7) as i64)
     }
 
     fn get_last_monday_of_month(&self, year: i32, month: u32) -> NaiveDate {

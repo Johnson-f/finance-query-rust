@@ -60,10 +60,10 @@ impl PriceBufferManager {
                 // Get the week identifier (year-week)
                 let week_str = format!("{}-W{:02}", current_date.year(), current_date.iso_week().week());
                 
-                if let Some(last_week) = last_dates.get(buffer_key) {
-                    if last_week == &week_str {
-                        return false; // Already added this week
-                    }
+                if let Some(last_week) = last_dates.get(buffer_key)
+                    && last_week == &week_str
+                {
+                    return false; // Already added this week
                 }
                 
                 // Update last week
@@ -72,10 +72,10 @@ impl PriceBufferManager {
                 // For daily: check if it's a new day
                 let date_str = current_date.format("%Y-%m-%d").to_string();
                 
-                if let Some(last_date) = last_dates.get(buffer_key) {
-                    if last_date == &date_str {
-                        return false; // Already added today
-                    }
+                if let Some(last_date) = last_dates.get(buffer_key)
+                    && last_date == &date_str
+                {
+                    return false; // Already added today
                 }
                 
                 // Update last date

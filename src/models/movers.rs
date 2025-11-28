@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MoverCount {
     #[serde(rename = "25")]
     TwentyFive,
     #[serde(rename = "50")]
+    #[default]
     Fifty,
     #[serde(rename = "100")]
     Hundred,
@@ -27,12 +28,6 @@ impl MoverCount {
             "100" => Some(MoverCount::Hundred),
             _ => None,
         }
-    }
-}
-
-impl Default for MoverCount {
-    fn default() -> Self {
-        MoverCount::Fifty
     }
 }
 

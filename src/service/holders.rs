@@ -29,7 +29,7 @@ pub async fn get_holders_data(
     info!("Fetching {} holders data for {}", holder_type.as_str(), symbol);
     
     let modules = get_modules_for_holder_type(holder_type);
-    let modules_refs: Vec<&str> = modules.iter().map(|s| *s).collect();
+    let modules_refs: Vec<&str> = modules.to_vec();
     
     // Fetch data from Yahoo Finance
     let response = yahoo_client
@@ -41,7 +41,7 @@ pub async fn get_holders_data(
         .get("quoteSummary")
         .and_then(|qs| qs.get("result"))
         .and_then(|r| r.as_array())
-        .and_then(|arr| arr.get(0))
+        .and_then(|arr| arr.first())
         .ok_or_else(|| {
             YahooError::ParseError(format!(
                 "No {} data found for {}",
@@ -143,28 +143,28 @@ fn parse_major_breakdown(data: &Value) -> Result<MajorHoldersBreakdown, YahooErr
     
     let mut breakdown_data = HashMap::new();
     
-    if let Some(val) = breakdown_data_obj.get("insidersPercentHeld") {
-        if let Some(raw) = val.as_f64() {
+    if let Some(val) = breakdown_data_obj.get("insidersPercentHeld")
+        && let Some(raw) = val.as_f64()
+    {
             breakdown_data.insert("insidersPercentHeld".to_string(), serde_json::json!(raw));
-        }
     }
     
-    if let Some(val) = breakdown_data_obj.get("institutionsPercentHeld") {
-        if let Some(raw) = val.as_f64() {
+    if let Some(val) = breakdown_data_obj.get("institutionsPercentHeld")
+        && let Some(raw) = val.as_f64()
+    {
             breakdown_data.insert("institutionsPercentHeld".to_string(), serde_json::json!(raw));
-        }
     }
     
-    if let Some(val) = breakdown_data_obj.get("institutionsFloatPercentHeld") {
-        if let Some(raw) = val.as_f64() {
+    if let Some(val) = breakdown_data_obj.get("institutionsFloatPercentHeld")
+        && let Some(raw) = val.as_f64()
+    {
             breakdown_data.insert("institutionsFloatPercentHeld".to_string(), serde_json::json!(raw));
-        }
     }
     
-    if let Some(val) = breakdown_data_obj.get("institutionsCount") {
-        if let Some(raw) = val.as_i64() {
+    if let Some(val) = breakdown_data_obj.get("institutionsCount")
+        && let Some(raw) = val.as_i64()
+    {
             breakdown_data.insert("institutionsCount".to_string(), serde_json::json!(raw));
-        }
     }
     
     Ok(MajorHoldersBreakdown { breakdown_data })
@@ -418,7 +418,7 @@ fn parse_insider_roster(data: &Value) -> Result<Vec<InsiderRosterMember>, YahooE
                 .get("positionIndirect")
                 .and_then(|pi| pi.get("raw"))
                 .and_then(|r| r.as_i64()),
-            position_direct_date: position_direct_date,
+            position_direct_date,
         };
         
         roster.push(member);

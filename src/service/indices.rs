@@ -113,10 +113,8 @@ fn get_fmt(data: &Value, key: &str) -> Option<String> {
                     })
             } else if let Some(num) = v.as_f64() {
                 Some(num.to_string())
-            } else if let Some(str_val) = v.as_str() {
-                Some(str_val.to_string())
             } else {
-                None
+                v.as_str().map(|str_val| str_val.to_string())
             }
         })
 }
@@ -126,10 +124,8 @@ fn format_return(value: Option<&Value>) -> Option<String> {
     value.and_then(|v| {
         let fmt = if let Some(obj) = v.as_object() {
             obj.get("fmt").and_then(|f| f.as_str().map(|s| s.to_string()))
-        } else if let Some(str_val) = v.as_str() {
-            Some(str_val.to_string())
         } else {
-            None
+            v.as_str().map(|str_val| str_val.to_string())
         };
         
         fmt.map(|f| {
@@ -151,7 +147,7 @@ async fn parse_yahoo_index(
         .get("quoteSummary")
         .and_then(|qs| qs.get("result"))
         .and_then(|r| r.as_array())
-        .and_then(|arr| arr.get(0))
+        .and_then(|arr| arr.first())
         .ok_or_else(|| YahooError::ParseError("No quoteSummary result found".to_string()))?;
     
     let price_data = summary_result.get("price").unwrap_or(&Value::Null);
@@ -225,24 +221,23 @@ async fn fetch_index(
     // If that fails, try the simple quotes endpoint
     match yahoo_client.get_simple_quotes(&[&symbol]).await {
         Ok(data) => {
-            if let Some(quote_response) = data.get("quoteResponse") {
-                if let Some(results) = quote_response.get("result").and_then(|r| r.as_array()) {
-                    if let Some(result) = results.get(0) {
-                        debug!("Successfully fetched simple quote for {}", symbol);
-                        // Convert simple quote format to quote-summary format for parsing
-                        let mock_summary = serde_json::json!({
-                            "quoteSummary": {
-                                "result": [{
-                                    "price": result,
-                                    "quoteUnadjustedPerformanceOverview": {
-                                        "performanceOverview": {}
-                                    }
-                                }]
+            if let Some(quote_response) = data.get("quoteResponse")
+                && let Some(results) = quote_response.get("result").and_then(|r| r.as_array())
+                && let Some(result) = results.first()
+            {
+                debug!("Successfully fetched simple quote for {}", symbol);
+                // Convert simple quote format to quote-summary format for parsing
+                let mock_summary = serde_json::json!({
+                    "quoteSummary": {
+                        "result": [{
+                            "price": result,
+                            "quoteUnadjustedPerformanceOverview": {
+                                "performanceOverview": {}
                             }
-                        });
-                        return parse_yahoo_index(mock_summary, index).await;
+                        }]
                     }
-                }
+                });
+                return parse_yahoo_index(mock_summary, index).await;
             }
         }
         Err(e) => {

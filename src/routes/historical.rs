@@ -28,9 +28,7 @@ pub async fn get_historical_handler(
         .map_err(|_| actix_web::error::ErrorBadRequest("Invalid interval"))?;
 
     // Validate minute intervals can only be used with 1d or 5d ranges
-    if let Err(e) = validate_interval_range_compatibility(&interval, &time_range) {
-        return Err(e);
-    }
+    validate_interval_range_compatibility(&interval, &time_range)?;
 
     let mut historical = service::get_historical(
         &app_state.yahoo_client,
@@ -49,7 +47,7 @@ pub async fn get_historical_handler(
         }
         
         // Parse periods (comma-separated, e.g., "10,20,50")
-        let periods_str = query.period.as_ref().map(|s| s.as_str()).unwrap_or("20");
+        let periods_str = query.period.as_deref().unwrap_or("20");
         let periods = parse_periods(periods_str)?;
         
         if periods.is_empty() {

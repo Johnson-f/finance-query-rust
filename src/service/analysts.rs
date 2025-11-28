@@ -29,7 +29,7 @@ pub async fn get_analysis_data(
     info!("Fetching {} analysis data for {}", analysis_type.as_str(), symbol);
     
     let modules = get_modules_for_analysis_type(analysis_type);
-    let modules_refs: Vec<&str> = modules.iter().map(|s| *s).collect();
+    let modules_refs: Vec<&str> = modules.to_vec();
     
     // Fetch data from Yahoo Finance
     let response = yahoo_client
@@ -41,7 +41,7 @@ pub async fn get_analysis_data(
         .get("quoteSummary")
         .and_then(|qs| qs.get("result"))
         .and_then(|r| r.as_array())
-        .and_then(|arr| arr.get(0))
+        .and_then(|arr| arr.first())
         .ok_or_else(|| {
             YahooError::ParseError(format!(
                 "No {} data found for {}",
@@ -173,10 +173,8 @@ fn safe_extract_value(value: Option<&Value>) -> Option<f64> {
             obj.get("raw").and_then(|r| r.as_f64())
         } else if let Some(num) = v.as_f64() {
             Some(num)
-        } else if let Some(num) = v.as_i64() {
-            Some(num as f64)
         } else {
-            None
+            v.as_i64().map(|num| num as f64)
         }
     })
 }
