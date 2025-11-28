@@ -12,6 +12,7 @@ use client::{FetchClient, YahooAuthManager, YahooFinanceClient};
 use middleware::rate_limit::RateLimitManager;
 use service::caching::CacheService;
 use service::websocket::ConnectionManager;
+use service::websocket::indicator::price_buffer::PriceBufferManager;
 use std::sync::Arc;
 use tracing::info;
 use tracing_actix_web::TracingLogger;
@@ -23,6 +24,7 @@ pub struct AppState {
     pub connection_manager: web::Data<service::websocket::ConnectionManagerAddr>,
     pub cache_service: Arc<CacheService>,
     pub rate_limit_manager: Arc<RateLimitManager>,
+    pub price_buffer_manager: Arc<PriceBufferManager>,
 }
 
 #[actix_web::main]
@@ -88,6 +90,9 @@ async fn main() -> std::io::Result<()> {
         rate_limit_manager.limit_per_day()
     );
 
+    // Initialize price buffer manager for moving averages
+    let price_buffer_manager = Arc::new(PriceBufferManager::new(1000));
+
     // Create app state
     let app_state = web::Data::new(AppState {
         yahoo_auth_manager,
@@ -96,6 +101,7 @@ async fn main() -> std::io::Result<()> {
         connection_manager: connection_manager_data.clone(),
         cache_service,
         rate_limit_manager: rate_limit_manager.clone(),
+        price_buffer_manager,
     });
 
     info!("Starting HTTP server on 0.0.0.0:8080");

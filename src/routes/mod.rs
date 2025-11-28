@@ -54,7 +54,8 @@ pub fn configure_routes(cfg: &mut actix_web::web::ServiceConfig) {
             .route("/ws/news", web::get().to(websocket::news_handler))
             .route("/ws/sectors", web::get().to(websocket::sectors_handler))
             .route("/ws/movers", web::get().to(websocket::movers_handler))
-            .route("/ws/hours", web::get().to(websocket::hours_handler)),
+            .route("/ws/hours", web::get().to(websocket::hours_handler))
+            .route("/ws/moving-average", web::get().to(websocket::moving_average_handler)),
     )
     .route("/ping", web::get().to(health::ping_handler))
     .route("/health", web::get().to(health::health_handler));

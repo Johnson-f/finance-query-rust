@@ -186,6 +186,23 @@ impl YahooFinanceClient {
         self.json(&url, Some(&params)).await
     }
 
+    /// Get chart data using period1 and period2 (Unix timestamps) instead of range
+    pub async fn get_chart_with_periods(
+        &self,
+        symbol: &str,
+        interval: &str,
+        period1: i64,
+        period2: i64,
+    ) -> Result<Value, YahooError> {
+        let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{}", symbol);
+        let params = [
+            ("interval", interval),
+            ("period1", &period1.to_string()),
+            ("period2", &period2.to_string()),
+        ];
+        self.json(&url, Some(&params)).await
+    }
+
     pub async fn search(&self, query: &str, hits: usize) -> Result<Value, YahooError> {
         let url = "https://query1.finance.yahoo.com/v1/finance/search";
         let params = [
