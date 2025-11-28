@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
+#[allow(dead_code)]
 pub enum Quarter {
     Q1,
     Q2,

@@ -25,6 +25,7 @@ pub struct RateLimitManager {
 }
 
 #[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
 struct RateLimitInfo {
     count: u64,
     limit: u64,
