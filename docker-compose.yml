@@ -1,33 +1,39 @@
-version: '3.8'
-
-# Simple production setup with nginx-proxy and Let's Encrypt
-# This uses the popular nginx-proxy/letsencrypt-nginx-proxy-companion
-# which automatically handles SSL certificates
+# Production setup with Caddy for automatic HTTPS
+# Caddy handles SSL certificates automatically via Let's Encrypt
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: finance-query-rust
-    environment:
-      # Redis configuration - Use external cloud Redis service (e.g., Sevalla Redis)
-      # Set REDIS_URL in .env file or environment: redis://your-redis-host:6379
-      - REDIS_URL=${REDIS_URL:-}
-      # Rate limiting configuration
-      - RATE_LIMIT_PER_DAY=10000
-      # Logging configuration
-      - RUST_LOG=info
-      # nginx-proxy configuration
-      - VIRTUAL_HOST=${DOMAIN:-localhost}
-      - VIRTUAL_PORT=8080
-      - LETSENCRYPT_HOST=${DOMAIN:-localhost}
-      - LETSENCRYPT_EMAIL=${EMAIL:-admin@example.com}
+  caddy:
+    image: caddy:latest
+    container_name: tradstry-caddy
     restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3 support
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
-      - finance-network
-    expose:
-      - "8080"
+      - web
+    depends_on:
+      - backend
+
+  backend:
+    image: johnsonf/finance-query-rust:latest
+    container_name: finance-query-rust
+    restart: unless-stopped
+    environment:
+      # Redis configuration (optional)
+      - REDIS_URL=${REDIS_URL:-}
+      # Rate limiting
+      - RATE_LIMIT_PER_DAY=${RATE_LIMIT_PER_DAY:-10000}
+      # Logging
+      - RUST_LOG=${RUST_LOG:-info}
+    networks:
+      - web
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -35,45 +41,10 @@ services:
       retries: 3
       start_period: 10s
 
-  nginx-proxy:
-    image: nginxproxy/nginx-proxy:alpine
-    container_name: finance-query-nginx-proxy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-      - nginx-certs:/etc/nginx/certs:ro
-      - nginx-vhost:/etc/nginx/vhost.d
-      - nginx-html:/usr/share/nginx/html
-    restart: unless-stopped
-    networks:
-      - finance-network
-    depends_on:
-      - letsencrypt
-
-  letsencrypt:
-    image: nginxproxy/acme-companion
-    container_name: finance-query-letsencrypt
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - nginx-certs:/etc/nginx/certs:rw
-      - nginx-vhost:/etc/nginx/vhost.d
-      - nginx-html:/usr/share/nginx/html
-      - acme-data:/etc/acme.sh
-    restart: unless-stopped
-    networks:
-      - finance-network
-    environment:
-      - DEFAULT_EMAIL=${EMAIL:-admin@example.com}
-
 volumes:
-  nginx-certs:
-  nginx-vhost:
-  nginx-html:
-  acme-data:
+  caddy_data:
+  caddy_config:
 
 networks:
-  finance-network:
+  web:
     driver: bridge
-
