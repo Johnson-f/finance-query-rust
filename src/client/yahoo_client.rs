@@ -8,7 +8,6 @@ use tracing::{debug, error, info, warn};
 
 pub struct YahooFinanceClient {
     auth_manager: Arc<YahooAuthManager>,
-    #[allow(dead_code)]
     fetch_client: Arc<FetchClient>,
 }
 
@@ -71,12 +70,21 @@ impl YahooFinanceClient {
         }
 
         // Create a new client with the cookie jar from auth manager
-        let client = reqwest::ClientBuilder::new()
+        // IMPORTANT: Also use the proxy for API requests
+        let mut builder = reqwest::ClientBuilder::new()
             .timeout(std::time::Duration::from_secs(30))
             .cookie_provider(cookie_jar.clone())
-            .redirect(reqwest::redirect::Policy::limited(10))
-            .build()
-            .map_err(YahooError::NetworkError)?;
+            .redirect(reqwest::redirect::Policy::limited(10));
+
+        // Add proxy configuration if available
+        if let Some(proxy_url) = self.fetch_client.auth_proxy() {
+            debug!("Using proxy for Yahoo API request: {}...", &proxy_url.chars().take(30).collect::<String>());
+            builder = builder
+                .proxy(reqwest::Proxy::all(proxy_url).map_err(YahooError::NetworkError)?)
+                .danger_accept_invalid_certs(true);
+        }
+
+        let client = builder.build().map_err(YahooError::NetworkError)?;
 
         let mut request = client
             .get(url)
@@ -286,7 +294,6 @@ impl YahooFinanceClient {
         ];
         self.json(url, Some(&params)).await
     }
-
     /// Make a Yahoo Finance API request and return the raw response
     /// This is useful for endpoints that need custom handling
     pub async fn make_request(
