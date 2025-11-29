@@ -43,9 +43,13 @@ impl YahooAuthManager {
             .redirect(reqwest::redirect::Policy::limited(10));
 
         if let Some(proxy_url) = &self.proxy {
-            builder = builder.proxy(reqwest::Proxy::all(proxy_url).map_err(|e| {
-                YahooError::NetworkError(e)
-            })?);
+            info!("Using proxy for Yahoo auth: {}...", &proxy_url.chars().take(30).collect::<String>());
+            builder = builder
+                .proxy(reqwest::Proxy::all(proxy_url).map_err(|e| {
+                    YahooError::NetworkError(e)
+                })?)
+                // Accept proxy's SSL certificate (Bright Data and similar proxies use self-signed certs)
+                .danger_accept_invalid_certs(true);
         }
 
         let client = builder.build().map_err(YahooError::NetworkError)?;
