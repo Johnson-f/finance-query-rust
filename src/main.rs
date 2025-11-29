@@ -38,6 +38,8 @@ async fn main() -> std::io::Result<()> {
     info!("Starting Finance Query Rust server...");
 
     // Get proxy from environment (optional)
+    // PROXY_URL = proxy for all requests
+    // AUTH_PROXY_URL = proxy only for Yahoo auth (saves bandwidth, uses residential IP only for crumb)
     let proxy = std::env::var("PROXY_URL").ok();
 
     // Initialize fetch client
@@ -46,9 +48,11 @@ async fn main() -> std::io::Result<()> {
             .expect("Failed to create fetch client"),
     );
 
-    // Initialize Yahoo auth manager with shared cookie jar from fetch client
+    // Initialize Yahoo auth manager with auth proxy (or general proxy as fallback)
+    // This allows using a residential proxy only for auth while data goes direct
+    let auth_proxy = fetch_client.auth_proxy().cloned();
     let yahoo_auth_manager = Arc::new(YahooAuthManager::new(
-        proxy.clone(),
+        auth_proxy,
         fetch_client.cookie_jar().clone(),
     ));
 

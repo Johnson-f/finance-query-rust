@@ -30,6 +30,8 @@ services:
       - REDIS_URL=${REDIS_URL:-}
       # Rate limiting
       - RATE_LIMIT_PER_DAY=${RATE_LIMIT_PER_DAY:-10000}
+      # Proxy for Yahoo auth only (residential IP for crumb fetching)
+      - AUTH_PROXY_URL=${AUTH_PROXY_URL:-}
       # Logging
       - RUST_LOG=${RUST_LOG:-info}
     networks:

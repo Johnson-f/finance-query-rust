@@ -11,10 +11,15 @@ pub struct FetchClient {
     cookie_jar: Arc<Jar>,
     #[allow(dead_code)]
     proxy: Option<String>,
+    /// Separate proxy URL only for Yahoo auth requests (to save bandwidth)
+    auth_proxy: Option<String>,
 }
 
 impl FetchClient {
     pub fn new(proxy: Option<String>) -> Result<Self, YahooError> {
+        // Check for auth-only proxy first, fall back to general proxy
+        let auth_proxy = std::env::var("AUTH_PROXY_URL").ok().or_else(|| proxy.clone());
+        
         let cookie_jar = Arc::new(Jar::default());
 
         let mut builder = ClientBuilder::new()
@@ -23,6 +28,7 @@ impl FetchClient {
             .cookie_provider(cookie_jar.clone())
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
+        // Only use proxy for general client if PROXY_URL is set (not AUTH_PROXY_URL)
         if let Some(proxy_url) = &proxy {
             builder = builder.proxy(reqwest::Proxy::all(proxy_url).map_err(|e| {
                 YahooError::NetworkError(e)
@@ -35,7 +41,13 @@ impl FetchClient {
             client,
             cookie_jar,
             proxy,
+            auth_proxy,
         })
+    }
+    
+    /// Get the proxy URL to use for auth requests only
+    pub fn auth_proxy(&self) -> Option<&String> {
+        self.auth_proxy.as_ref()
     }
 
     pub fn client(&self) -> &Client {
