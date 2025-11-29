@@ -1,6 +1,6 @@
-# Multi-stage Dockerfile for finance-query-rust
+# Multi-stage Dockerfile for finance-query-rust with Nightly Rust
 # Stage 1: Build stage
-FROM rust:1.82-slim as builder
+FROM rustlang/rust:nightly-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
