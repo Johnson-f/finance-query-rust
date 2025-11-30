@@ -13,9 +13,30 @@ pub async fn get_quotes(
 ) -> Result<Vec<Quote>, YahooError> {
     info!("Fetching quotes for symbols: {:?}", symbols);
     
+    // Check if we should force scraping (for local development/testing)
+    let force_scraping = std::env::var("FORCE_SCRAPING").is_ok();
+    
     // Fetch detailed quotes using quoteSummary endpoint for each symbol
     let mut quotes = Vec::new();
     for symbol in symbols {
+        // If force_scraping is enabled, skip API and go straight to scraping
+        if force_scraping {
+            info!("FORCE_SCRAPING enabled, using scraper for {}", symbol);
+            match scraper::scrape_quote(fetch_client, symbol).await {
+                Ok(quote_data) => {
+                    if let Ok(mut quote) = parse_quote_from_scraped(quote_data) {
+                        info!("Successfully parsed scraped quote for {}", symbol);
+                        quote.logo = logo::get_logo(fetch_client, Some(symbol), None).await;
+                        quotes.push(quote);
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to scrape quote for {}: {}", symbol, e);
+                }
+            }
+            continue;
+        }
+        
         match yahoo_client.get_quote(symbol).await {
             Ok(data) => {
                 debug!("Received quoteSummary response for {}: {}", symbol, serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string()));

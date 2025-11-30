@@ -4,6 +4,134 @@ use scraper::{Html, Selector};
 use std::sync::Arc;
 use tracing::{debug, warn};
 use serde_json::Value;
+use regex::Regex;
+
+pub async fn scrape_quote(
+    fetch_client: &Arc<FetchClient>,
+    symbol: &str,
+) -> Result<serde_json::Value, YahooError> {
+    let url = format!("https://finance.yahoo.com/quote/{}/", symbol);
+    debug!("Scraping quote from: {}", url);
+    let html = fetch_client.fetch(&url).await?;
+    debug!("Fetched HTML, length: {} bytes", html.len());
+
+    let document = Html::parse_document(&html);
+
+    // Extract company name from h1
+    let name_selector = Selector::parse("h1").map_err(|e| {
+        YahooError::ParseError(format!("Failed to parse name selector: {}", e))
+    })?;
+    let name = document
+        .select(&name_selector)
+        .next()
+        .map(|el| {
+            let full_text: String = el.text().collect();
+            // Format is usually "Company Name (SYMBOL)"
+            full_text.split('(').next().unwrap_or(&full_text).trim().to_string()
+        })
+        .unwrap_or_else(|| symbol.to_string());
+    
+    debug!("Extracted name: {}", name);
+
+    // NEW: Try multiple strategies to extract price data
+    
+    // Strategy 1: Look for fin-streamer elements (current Yahoo Finance format)
+    let price = extract_fin_streamer_value(&document, "regularMarketPrice")
+        .or_else(|| extract_data_field_value(&document, "regularMarketPrice"))
+        .or_else(|| extract_from_json_ld(&document, "price"))
+        .unwrap_or(0.0);
+    
+    let change = extract_fin_streamer_value(&document, "regularMarketChange")
+        .or_else(|| extract_data_field_value(&document, "regularMarketChange"))
+        .unwrap_or(0.0);
+    
+    let percent_change = extract_fin_streamer_value(&document, "regularMarketChangePercent")
+        .or_else(|| extract_data_field_value(&document, "regularMarketChangePercent"))
+        .unwrap_or(0.0);
+
+    debug!("Extracted values - price: {}, change: {}, percent_change: {}", price, change, percent_change);
+
+    Ok(serde_json::json!({
+        "symbol": symbol.to_uppercase(),
+        "name": name,
+        "price": price,
+        "change": change,
+        "percent_change": percent_change,
+    }))
+}
+
+// Extract value from fin-streamer elements (current Yahoo format)
+fn extract_fin_streamer_value(document: &Html, data_field: &str) -> Option<f64> {
+    let selector = Selector::parse(&format!(r#"fin-streamer[data-field="{}"]"#, data_field)).ok()?;
+    document
+        .select(&selector)
+        .next()
+        .and_then(|el| {
+            // Try data-value attribute first
+            el.value().attr("data-value")
+                .and_then(|v| v.parse::<f64>().ok())
+                .or_else(|| {
+                    // Fallback to text content
+                    let text: String = el.text().collect();
+                    parse_numeric_value(&text)
+                })
+        })
+}
+
+// Fallback: Extract from old data-field format
+fn extract_data_field_value(document: &Html, data_field: &str) -> Option<f64> {
+    let selector = Selector::parse(&format!(r#"span[data-field="{}"]"#, data_field)).ok()?;
+    document
+        .select(&selector)
+        .next()
+        .and_then(|el| {
+            let text: String = el.text().collect();
+            parse_numeric_value(&text)
+        })
+}
+
+// Extract from JSON-LD structured data
+fn extract_from_json_ld(document: &Html, field: &str) -> Option<f64> {
+    let script_selector = Selector::parse(r#"script[type="application/ld+json"]"#).ok()?;
+    
+    for script in document.select(&script_selector) {
+        let json_text: String = script.text().collect();
+        if let Ok(json) = serde_json::from_str::<Value>(&json_text) {
+            if field == "price" {
+                if let Some(price_val) = json.get("price").or_else(|| json.get("offers").and_then(|o| o.get("price"))) {
+                    if let Some(price_str) = price_val.as_str() {
+                        return parse_numeric_value(price_str);
+                    } else if let Some(price_num) = price_val.as_f64() {
+                        return Some(price_num);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+// Parse numeric value from string, handling commas, currency symbols, percentages
+fn parse_numeric_value(text: &str) -> Option<f64> {
+    let cleaned = text
+        .trim()
+        .replace(',', "")
+        .replace('$', "")
+        .replace('%', "")
+        .replace('+', "")
+        .trim()
+        .to_string();
+    
+    cleaned.parse::<f64>().ok()
+}
+
+pub async fn scrape_simple_quote(
+    fetch_client: &Arc<FetchClient>,
+    symbol: &str,
+) -> Result<serde_json::Value, YahooError> {
+    // For simple quotes, we can use the same scraping logic but return less data
+    scrape_quote(fetch_client, symbol).await
+}
 
 // Helper function to extract a JSON object from a string
 fn extract_json_object(json_str: &str) -> Result<Value, YahooError> {
@@ -118,73 +246,6 @@ fn search_for_transcript(value: &Value) -> Option<Value> {
     }
 }
 
-pub async fn scrape_quote(
-    fetch_client: &Arc<FetchClient>,
-    symbol: &str,
-) -> Result<serde_json::Value, YahooError> {
-    let url = format!("https://finance.yahoo.com/quote/{}/", symbol);
-    let html = fetch_client.fetch(&url).await?;
-
-    let document = Html::parse_document(&html);
-
-    // Extract company name
-    let name_selector = Selector::parse("h1").map_err(|e| {
-        YahooError::ParseError(format!("Failed to parse name selector: {}", e))
-    })?;
-    let name = document
-        .select(&name_selector)
-        .next()
-        .and_then(|el| el.text().nth(1))
-        .map(|s| s.split('(').next().unwrap_or("").trim().to_string())
-        .unwrap_or_else(|| symbol.to_string());
-
-    // Extract price data
-    let price_selector = Selector::parse(r#"span[data-field="regularMarketPrice"]"#)
-        .map_err(|e| YahooError::ParseError(format!("Failed to parse price selector: {}", e)))?;
-    let price = document
-        .select(&price_selector)
-        .next()
-        .and_then(|el| el.text().next())
-        .and_then(|s| s.parse::<f64>().ok())
-        .unwrap_or(0.0);
-
-    // Extract change
-    let change_selector = Selector::parse(r#"span[data-field="regularMarketChange"]"#)
-        .map_err(|e| YahooError::ParseError(format!("Failed to parse change selector: {}", e)))?;
-    let change = document
-        .select(&change_selector)
-        .next()
-        .and_then(|el| el.text().next())
-        .and_then(|s| s.parse::<f64>().ok())
-        .unwrap_or(0.0);
-
-    // Extract percent change
-    let percent_change_selector = Selector::parse(r#"span[data-field="regularMarketChangePercent"]"#)
-        .map_err(|e| YahooError::ParseError(format!("Failed to parse percent change selector: {}", e)))?;
-    let percent_change = document
-        .select(&percent_change_selector)
-        .next()
-        .and_then(|el| el.text().next())
-        .and_then(|s| s.trim().trim_end_matches('%').parse::<f64>().ok())
-        .unwrap_or(0.0);
-
-    Ok(serde_json::json!({
-        "symbol": symbol.to_uppercase(),
-        "name": name,
-        "price": price,
-        "change": change,
-        "percent_change": percent_change,
-    }))
-}
-
-pub async fn scrape_simple_quote(
-    fetch_client: &Arc<FetchClient>,
-    symbol: &str,
-) -> Result<serde_json::Value, YahooError> {
-    // For simple quotes, we can use the same scraping logic but return less data
-    scrape_quote(fetch_client, symbol).await
-}
-
 pub async fn scrape_earnings_calls_list(
     fetch_client: &Arc<FetchClient>,
     symbol: &str,
@@ -216,9 +277,9 @@ pub async fn scrape_earnings_calls_list(
     
     debug!("Found {} links containing 'earnings_call'", earnings_links.len());
 
-    let event_id_regex = regex::Regex::new(r"earnings_call-(\d+)")
+    let event_id_regex = Regex::new(r"earnings_call-(\d+)")
         .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
-    let quarter_year_regex = regex::Regex::new(r"-([Qq]\d)-(\d{4})-earnings_call")
+    let quarter_year_regex = Regex::new(r"-([Qq]\d)-(\d{4})-earnings_call")
         .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
 
     let mut calls = Vec::new();
@@ -304,7 +365,7 @@ pub async fn scrape_earnings_transcript_from_url(
         .map_err(|e| YahooError::ParseError(format!("Failed to parse script selector: {}", e)))?;
     
     // Pre-compile regex outside the loop for Strategy 2
-    let transcript_content_regex = regex::Regex::new(r#""transcriptContent"\s*:\s*\{[^}]*\}"#)
+    let transcript_content_regex = Regex::new(r#""transcriptContent"\s*:\s*\{[^}]*\}"#)
         .map_err(|e| YahooError::ParseError(format!("Regex error: {}", e)))?;
     
     // Look for script tags containing transcript data

@@ -20,7 +20,7 @@ curl http://localhost:8080/health
 Get detailed quote information for one or more symbols (comma-separated):
 ```bash
 # Single symbol
-curl "http://localhost:8080/v1/quotes?symbols=AAPL"
+curl "https://api.tradstry,com/v1/quotes?symbols=AAPL"
 
 # Multiple symbols
 curl "http://localhost:8080/v1/quotes?symbols=AAPL,MSFT,GOOGL"
@@ -79,7 +79,7 @@ curl "http://localhost:8080/v1/news/AAPL"
 ### Get General News
 Get general financial news:
 ```bash
-curl "http://localhost:8080/v1/news"
+curl "https://api.tradstry.com/v1/news"
 ```
 
 ## Financials
@@ -99,7 +99,7 @@ curl "http://localhost:8080/v1/financials/AAPL?statement=income&frequency=annual
 curl "http://localhost:8080/v1/financials/AAPL?statement=balance&frequency=quarterly"
 
 # Annual cash flow
-curl "http://localhost:8080/v1/financials/MSFT?statement=cashflow&frequency=annual"
+curl "https://api.tradstry.com/v1/financials/MSFT?statement=cashflow&frequency=annual"
 ```
 
 ## Earnings
