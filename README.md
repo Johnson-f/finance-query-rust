@@ -2,6 +2,13 @@
 
 A high-performance financial data API built with Rust and Actix-Web, providing real-time stock quotes, historical data, financial statements, news, and more from Yahoo Finance.
 
+## Project Structure
+
+This is a Cargo workspace containing:
+
+- **`finance-query-core`** - Reusable library crate for Yahoo Finance data fetching ([crates.io](https://crates.io/crates/finance-query-core))
+- **Root crate** - REST API and WebSocket server built with Actix-Web
+
 ## Features
 
 - 🚀 **High Performance**: Built with Rust and Actix-Web for maximum throughput
@@ -11,31 +18,64 @@ A high-performance financial data API built with Rust and Actix-Web, providing r
 - 🔒 **Rate Limiting**: Built-in IP-based rate limiting with Redis
 - 💾 **Caching**: Redis-based caching for improved performance
 - 🌐 **CORS Enabled**: Ready for frontend integration
+- 📦 **Modular**: Core functionality available as a standalone library
 
 ## Quick Start
 
-### Prerequisites
+### Using the Library
+
+Add `finance-query-core` to your project:
+
+```toml
+[dependencies]
+finance-query-core = "0.1.0"
+```
+
+```rust
+use finance_query_core::{YahooFinanceClient, Quote};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = YahooFinanceClient::new();
+    let quotes = client.fetch_quotes(&["AAPL", "MSFT"]).await?;
+    
+    for quote in quotes {
+        println!("{}: ${}", quote.symbol, quote.regular_market_price);
+    }
+    
+    Ok(())
+}
+```
+
+See the [finance-query-core README](./finance-query-core/README.md) for detailed library documentation.
+
+### Running the API Server
+
+#### Prerequisites
 
 - Rust 1.70+ (Rust 2024 edition)
 - Redis (optional, for caching and rate limiting)
 
-### Installation
+#### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/Johnson-f/finance-query-rust.git
+git clone https://github.com/jbradleynh/finance-query-rust.git
 cd finance-query-rust
 
 # For development
-# Run the script
 ./start.sh
+
+# Or manually
+cargo run --release
 
 # Checking for errors after making changes
 cargo check
 ```
 
-The API will be available at `http://localhost:8080` in development
-The API will be available at `https://api.tradstry.com` in production
+The API will be available at:
+- Development: `http://localhost:8080`
+- Production: `https://api.tradstry.com`
 
 ## Environment Variables
 
@@ -149,22 +189,32 @@ The application will automatically build and deploy.
 
 ## Documentation
 
+### API Server
 - [Getting Started](./docs/getting-started.md)
 - [API Documentation](./docs/api/)
-- [Architecture](./docs/development/architecture.md)
-- [Contributing](./docs/development/contributing.md)
-- [Docker Deployment](./DOCKER.md)
+- [CURL Examples](./docs/development/CURL_EXAMPLES.md)
+- [WebSocket Documentation](./docs/websockets/)
+- [HTTPS Setup](./docs/deployment/HTTPS_SETUP.md)
+
+### Library
+- [finance-query-core Documentation](./finance-query-core/README.md)
+- [Examples](./finance-query-core/examples/)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+- **API Server**: MIT License - see the [LICENSE](./LICENSE) file
+- **finance-query-core**: Apache-2.0 License - see [finance-query-core/LICENSE](./finance-query-core/LICENSE)
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](./docs/development/contributing.md) for guidelines.
+Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## Support
 
-- [Issue Tracker](https://github.com/Verdenroz/finance-query-rust/issues)
+- [Issue Tracker](https://github.com/johnson-f/finance-query-rust/issues)
 - [Documentation](https://johnson-f.github.io/finance-query-rust/)
+
+## Related Projects
+
+- [finance-query-core](https://crates.io/crates/finance-query-core) - The standalone library on crates.io
 
