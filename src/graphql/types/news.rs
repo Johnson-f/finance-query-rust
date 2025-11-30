@@ -1,5 +1,5 @@
 use async_graphql::*;
-use crate::models::news::News as NewsModel;
+use finance_query_core::models::news::News as NewsModel;
 
 #[derive(SimpleObject, Clone)]
 pub struct News {

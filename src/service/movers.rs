@@ -1,5 +1,5 @@
-use crate::client::{error::YahooError, YahooFinanceClient};
-use crate::models::movers::{MarketMover, MoverCount};
+use finance_query_core::client::{error::YahooError, YahooFinanceClient};
+use finance_query_core::models::movers::{MarketMover, MoverCount};
 use serde_json::Value;
 use tracing::{debug, error, info};
 

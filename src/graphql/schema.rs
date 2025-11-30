@@ -2,10 +2,10 @@ use async_graphql::*;
 use actix_web::web;
 use crate::AppState;
 use crate::graphql::types::*;
-use crate::models::historical::{TimeRange as TimeRangeModel, Interval as IntervalModel, IndicatorType as IndicatorTypeModel};
-use crate::models::holders::HolderType;
-use crate::models::analysts::AnalysisType;
-use crate::models::financials::{StatementType as StatementTypeModel, Frequency as FrequencyModel};
+use finance_query_core::models::historical::{TimeRange as TimeRangeModel, Interval as IntervalModel, IndicatorType as IndicatorTypeModel};
+use finance_query_core::models::holders::HolderType;
+use finance_query_core::models::analysts::AnalysisType;
+use finance_query_core::models::financials::{StatementType as StatementTypeModel, Frequency as FrequencyModel};
 use crate::service::historical::calculate_indicators;
 use crate::service::market::MarketSchedule;
 use crate::service::websocket::indicator::moving_average::{MovingAverageType, calculate_ma};
@@ -76,7 +76,7 @@ impl Query {
         .await
         .map_err(|e| Error::new(e.to_string()))?;
         Ok(quotes.into_iter()
-            .map(crate::models::quote::DetailedQuote::from)
+            .map(finance_query_core::models::quote::DetailedQuote::from)
             .map(DetailedQuote::from)
             .collect())
     }
@@ -286,7 +286,7 @@ impl Query {
     // Movers endpoints
     async fn actives(&self, ctx: &Context<'_>) -> Result<Vec<MarketMover>> {
         let context = ctx.data::<AppContext>()?;
-        use crate::models::movers::MoverCount;
+        use finance_query_core::models::movers::MoverCount;
         let movers = crate::service::get_actives(
             &context.app_state.yahoo_client,
             MoverCount::Fifty,
@@ -298,7 +298,7 @@ impl Query {
 
     async fn gainers(&self, ctx: &Context<'_>) -> Result<Vec<MarketMover>> {
         let context = ctx.data::<AppContext>()?;
-        use crate::models::movers::MoverCount;
+        use finance_query_core::models::movers::MoverCount;
         let movers = crate::service::get_gainers(
             &context.app_state.yahoo_client,
             MoverCount::Fifty,
@@ -310,7 +310,7 @@ impl Query {
 
     async fn losers(&self, ctx: &Context<'_>) -> Result<Vec<MarketMover>> {
         let context = ctx.data::<AppContext>()?;
-        use crate::models::movers::MoverCount;
+        use finance_query_core::models::movers::MoverCount;
         let movers = crate::service::get_losers(
             &context.app_state.yahoo_client,
             MoverCount::Fifty,
@@ -485,7 +485,7 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let recommendations: Vec<crate::models::analysts::RecommendationData> = 
+        let recommendations: Vec<finance_query_core::models::analysts::RecommendationData> = 
             serde_json::from_value(data.get("recommendations")
                 .ok_or_else(|| Error::new("No recommendations data"))?
                 .clone())
@@ -512,7 +512,7 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let upgrades_downgrades: Vec<crate::models::analysts::UpgradeDowngrade> = 
+        let upgrades_downgrades: Vec<finance_query_core::models::analysts::UpgradeDowngrade> = 
             serde_json::from_value(data.get("upgrades_downgrades")
                 .ok_or_else(|| Error::new("No upgrades_downgrades data"))?
                 .clone())
@@ -539,7 +539,7 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let price_targets: crate::models::analysts::PriceTarget = 
+        let price_targets: finance_query_core::models::analysts::PriceTarget = 
             serde_json::from_value(data.get("price_targets")
                 .ok_or_else(|| Error::new("No price_targets data"))?
                 .clone())
@@ -566,7 +566,7 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let earnings_estimate: crate::models::analysts::EarningsEstimate = 
+        let earnings_estimate: finance_query_core::models::analysts::EarningsEstimate = 
             serde_json::from_value(data.get("earnings_estimate")
                 .ok_or_else(|| Error::new("No earnings_estimate data"))?
                 .clone())
@@ -593,7 +593,7 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let revenue_estimate: crate::models::analysts::RevenueEstimate = 
+        let revenue_estimate: finance_query_core::models::analysts::RevenueEstimate = 
             serde_json::from_value(data.get("revenue_estimate")
                 .ok_or_else(|| Error::new("No revenue_estimate data"))?
                 .clone())
@@ -620,7 +620,7 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let earnings_history: Vec<crate::models::analysts::EarningsHistoryItem> = 
+        let earnings_history: Vec<finance_query_core::models::analysts::EarningsHistoryItem> = 
             serde_json::from_value(data.get("earnings_history")
                 .ok_or_else(|| Error::new("No earnings_history data"))?
                 .clone())
@@ -667,7 +667,7 @@ impl Query {
         sector: String,
     ) -> Result<MarketSectorDetails> {
         let context = ctx.data::<AppContext>()?;
-        use crate::models::sectors::Sector;
+        use finance_query_core::models::sectors::Sector;
         use std::str::FromStr;
         let sector_enum = Sector::from_str(&sector)
             .map_err(|e| Error::new(format!("Invalid sector: {}", e)))?;
@@ -807,7 +807,7 @@ impl Subscription {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();
                     
-                    use crate::models::indices::Index;
+                    use finance_query_core::models::indices::Index;
                     let indices_to_fetch = vec![Index::Dji, Index::Ixic, Index::Gspc];
                     
                     match crate::service::get_indices(&yahoo, &fetch, Some(indices_to_fetch), None).await {
@@ -909,7 +909,7 @@ impl Subscription {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     
-                    use crate::models::movers::MoverCount;
+                    use finance_query_core::models::movers::MoverCount;
                     let actives_task = crate::service::get_actives(&yahoo, MoverCount::Fifty);
                     let gainers_task = crate::service::get_gainers(&yahoo, MoverCount::Fifty);
                     let losers_task = crate::service::get_losers(&yahoo, MoverCount::Fifty);
@@ -921,7 +921,7 @@ impl Subscription {
                     );
                     
                     // Filter to US-only stocks (symbols without dots or with US exchange suffixes)
-                    let filter_us = |movers: Vec<crate::models::movers::MarketMover>| -> Vec<MarketMover> {
+                    let filter_us = |movers: Vec<finance_query_core::models::movers::MarketMover>| -> Vec<MarketMover> {
                         movers.into_iter()
                             .filter(|m| {
                                 let symbol = &m.symbol;

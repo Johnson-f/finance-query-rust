@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse, Result};
+use crate::error::IntoWebResult;
 use crate::service;
 use crate::service::caching::{news_key, TTL_NEWS};
 use serde::Deserialize;
@@ -26,12 +27,14 @@ pub async fn get_news_handler(
             &app_state.fetch_client,
             symbol,
         )
-        .await?
+        .await
+        .into_web_result()?
     } else {
         service::scrape_general_news(
             &app_state.fetch_client,
         )
-        .await?
+        .await
+        .into_web_result()?
     };
 
     // Cache the result
@@ -60,7 +63,8 @@ pub async fn get_news_by_symbol_handler(
         &app_state.fetch_client,
         &symbol,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     // Cache the result
     let news_json: Value = serde_json::to_value(&news)

@@ -1,6 +1,7 @@
-use crate::client::{scraper, YahooFinanceClient};
-use crate::client::error::YahooError;
-use crate::models::{Quote, SimpleQuote};
+use finance_query_core::client::{scraper, YahooFinanceClient};
+use finance_query_core::client::error::YahooError;
+use finance_query_core::client::FetchClient;
+use finance_query_core::models::{Quote, SimpleQuote};
 use crate::service::logo;
 use serde_json::Value;
 use std::sync::Arc;
@@ -8,7 +9,7 @@ use tracing::{debug, error, info, warn};
 
 pub async fn get_quotes(
     yahoo_client: &YahooFinanceClient,
-    fetch_client: &Arc<crate::client::FetchClient>,
+    fetch_client: &Arc<FetchClient>,
     symbols: &[&str],
 ) -> Result<Vec<Quote>, YahooError> {
     info!("Fetching quotes for symbols: {:?}", symbols);
@@ -90,7 +91,7 @@ pub async fn get_quotes(
 
 pub async fn get_simple_quotes(
     yahoo_client: &YahooFinanceClient,
-    fetch_client: &Arc<crate::client::FetchClient>,
+    fetch_client: &Arc<FetchClient>,
     symbols: &[&str],
 ) -> Result<Vec<SimpleQuote>, YahooError> {
     info!("Fetching simple quotes for symbols: {:?}", symbols);
@@ -195,7 +196,7 @@ fn format_date(date_val: Option<&Value>) -> Option<String> {
 
 async fn parse_quote_from_summary(
     data: Value,
-    fetch_client: &Arc<crate::client::FetchClient>,
+    fetch_client: &Arc<FetchClient>,
     symbol: &str,
 ) -> Result<Quote, YahooError> {
     let summary_result = data
@@ -765,7 +766,7 @@ fn parse_simple_quote_from_scraped(data: Value) -> Result<SimpleQuote, YahooErro
 
 pub async fn get_similar_quotes(
     yahoo_client: &YahooFinanceClient,
-    fetch_client: &Arc<crate::client::FetchClient>,
+    fetch_client: &Arc<FetchClient>,
     symbol: &str,
     limit: usize,
 ) -> Result<Vec<SimpleQuote>, YahooError> {

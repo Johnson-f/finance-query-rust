@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse, Result};
+use crate::error::IntoWebResult;
 use crate::service;
 use serde::Deserialize;
 
@@ -33,7 +34,8 @@ pub async fn get_similar_quotes_handler(
         &symbol,
         limit,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     if quotes.is_empty() {
         return Ok(HttpResponse::NotFound().json(serde_json::json!({

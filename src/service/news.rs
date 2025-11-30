@@ -1,6 +1,6 @@
-use crate::client::error::YahooError;
-use crate::client::FetchClient;
-use crate::models::News;
+use finance_query_core::client::error::YahooError;
+use finance_query_core::client::FetchClient;
+use finance_query_core::models::News;
 use serde_json;
 use std::sync::Arc;
 use tracing::info;

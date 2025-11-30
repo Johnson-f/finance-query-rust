@@ -1,8 +1,10 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::analysts::{
-    AnalysisType, EarningsEstimateResponse, EarningsHistoryResponse, PriceTargetsResponse,
-    RecommendationsResponse, RevenueEstimateResponse, UpgradesDowngradesResponse,
+use finance_query_core::models::analysts::{
+    AnalysisType, EarningsEstimate, EarningsEstimateResponse, EarningsHistoryItem, EarningsHistoryResponse, 
+    PriceTarget, PriceTargetsResponse, RecommendationData, RecommendationsResponse, 
+    RevenueEstimate, RevenueEstimateResponse, UpgradeDowngrade, UpgradesDowngradesResponse,
 };
+use crate::error::IntoWebResult;
 use crate::service::analysts;
 use crate::service::caching::{analysts_key, TTL_ANALYSTS};
 use serde_json::Value;
@@ -24,14 +26,15 @@ pub async fn get_recommendations_handler(
         &symbol,
         AnalysisType::Recommendations,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let symbol_str = data.get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or(&symbol)
         .to_string();
     
-    let recommendations: Vec<crate::models::analysts::RecommendationData> = serde_json::from_value(
+    let recommendations: Vec<RecommendationData> = serde_json::from_value(
         data.get("recommendations")
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No recommendations data"))?
             .clone()
@@ -67,14 +70,15 @@ pub async fn get_upgrades_downgrades_handler(
         &symbol,
         AnalysisType::UpgradesDowngrades,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let symbol_str = data.get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or(&symbol)
         .to_string();
     
-    let upgrades_downgrades: Vec<crate::models::analysts::UpgradeDowngrade> = serde_json::from_value(
+    let upgrades_downgrades: Vec<UpgradeDowngrade> = serde_json::from_value(
         data.get("upgrades_downgrades")
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No upgrades_downgrades data"))?
             .clone()
@@ -110,14 +114,15 @@ pub async fn get_price_targets_handler(
         &symbol,
         AnalysisType::PriceTargets,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let symbol_str = data.get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or(&symbol)
         .to_string();
     
-    let price_targets: crate::models::analysts::PriceTarget = serde_json::from_value(
+    let price_targets: PriceTarget = serde_json::from_value(
         data.get("price_targets")
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No price_targets data"))?
             .clone()
@@ -153,14 +158,15 @@ pub async fn get_earnings_estimate_handler(
         &symbol,
         AnalysisType::EarningsEstimate,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let symbol_str = data.get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or(&symbol)
         .to_string();
     
-    let earnings_estimate: crate::models::analysts::EarningsEstimate = serde_json::from_value(
+    let earnings_estimate: EarningsEstimate = serde_json::from_value(
         data.get("earnings_estimate")
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No earnings_estimate data"))?
             .clone()
@@ -196,14 +202,15 @@ pub async fn get_revenue_estimate_handler(
         &symbol,
         AnalysisType::RevenueEstimate,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let symbol_str = data.get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or(&symbol)
         .to_string();
     
-    let revenue_estimate: crate::models::analysts::RevenueEstimate = serde_json::from_value(
+    let revenue_estimate: RevenueEstimate = serde_json::from_value(
         data.get("revenue_estimate")
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No revenue_estimate data"))?
             .clone()
@@ -239,14 +246,15 @@ pub async fn get_earnings_history_handler(
         &symbol,
         AnalysisType::EarningsHistory,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let symbol_str = data.get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or(&symbol)
         .to_string();
     
-    let earnings_history: Vec<crate::models::analysts::EarningsHistoryItem> = serde_json::from_value(
+    let earnings_history: Vec<EarningsHistoryItem> = serde_json::from_value(
         data.get("earnings_history")
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("No earnings_history data"))?
             .clone()

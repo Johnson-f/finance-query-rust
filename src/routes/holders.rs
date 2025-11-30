@@ -1,8 +1,9 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::holders::{
+use finance_query_core::models::holders::{
     HolderType, InsiderPurchasesResponse, InsiderRosterResponse, InsiderTransactionsResponse,
     InstitutionalHoldersResponse, MajorHoldersResponse, MutualFundHoldersResponse,
 };
+use crate::error::IntoWebResult;
 use crate::service::holders;
 use crate::service::caching::{holders_key, TTL_HOLDERS};
 use serde_json::Value;
@@ -24,7 +25,8 @@ pub async fn get_major_holders_handler(
         &symbol,
         HolderType::Major,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let response = MajorHoldersResponse {
         symbol: data.symbol,
@@ -57,7 +59,8 @@ pub async fn get_institutional_holders_handler(
         &symbol,
         HolderType::Institutional,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let response = InstitutionalHoldersResponse {
         symbol: data.symbol,
@@ -90,7 +93,8 @@ pub async fn get_mutualfund_holders_handler(
         &symbol,
         HolderType::MutualFund,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let response = MutualFundHoldersResponse {
         symbol: data.symbol,
@@ -123,7 +127,8 @@ pub async fn get_insider_transactions_handler(
         &symbol,
         HolderType::InsiderTransactions,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let response = InsiderTransactionsResponse {
         symbol: data.symbol,
@@ -156,7 +161,8 @@ pub async fn get_insider_purchases_handler(
         &symbol,
         HolderType::InsiderPurchases,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let response = InsiderPurchasesResponse {
         symbol: data.symbol,
@@ -189,7 +195,8 @@ pub async fn get_insider_roster_handler(
         &symbol,
         HolderType::InsiderRoster,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     
     let response = InsiderRosterResponse {
         symbol: data.symbol,

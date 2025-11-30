@@ -1,5 +1,5 @@
-use crate::client::{error::YahooError, FetchClient, YahooFinanceClient};
-use crate::models::sectors::{MarketSector, MarketSectorDetails, Sector};
+use finance_query_core::client::{error::YahooError, FetchClient, YahooFinanceClient};
+use finance_query_core::models::sectors::{MarketSector, MarketSectorDetails, Sector};
 use serde_json;
 use std::sync::Arc;
 use tracing::{info, debug, warn};

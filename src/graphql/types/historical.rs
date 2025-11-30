@@ -1,6 +1,6 @@
 use async_graphql::*;
 use std::collections::HashMap;
-use crate::models::historical::{
+use finance_query_core::models::historical::{
     HistoricalData as HistoricalDataModel,
     HistoricalResponse as HistoricalResponseModel,
     TimeRange as TimeRangeModel,

@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::{TimeRange, Interval};
-use crate::models::historical::IndicatorType;
+use finance_query_core::models::{TimeRange, Interval};
+use finance_query_core::models::historical::IndicatorType;
+use crate::error::IntoWebResult;
 use crate::service;
 use crate::service::historical::calculate_indicators;
 use serde::Deserialize;
@@ -36,7 +37,8 @@ pub async fn get_historical_handler(
         time_range,
         interval,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     // Calculate indicators if requested
     if let Some(indicators_str) = &query.indicators {

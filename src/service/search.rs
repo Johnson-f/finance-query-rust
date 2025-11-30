@@ -1,6 +1,6 @@
-use crate::client::YahooFinanceClient;
-use crate::client::error::YahooError;
-use crate::models::{SearchResult, SearchResponse};
+use finance_query_core::client::YahooFinanceClient;
+use finance_query_core::client::error::YahooError;
+use finance_query_core::models::{SearchResult, SearchResponse};
 use serde_json::Value;
 
 pub async fn search(

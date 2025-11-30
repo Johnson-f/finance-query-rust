@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::movers::MoverCount;
+use finance_query_core::models::movers::MoverCount;
+use crate::error::IntoWebResult;
 use crate::service::movers;
 use serde::Deserialize;
 
@@ -24,7 +25,8 @@ pub async fn get_actives_handler(
         &app_state.yahoo_client,
         count,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     Ok(HttpResponse::Ok().json(movers_list))
 }
@@ -40,7 +42,8 @@ pub async fn get_gainers_handler(
         &app_state.yahoo_client,
         count,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     Ok(HttpResponse::Ok().json(movers_list))
 }
@@ -56,7 +59,8 @@ pub async fn get_losers_handler(
         &app_state.yahoo_client,
         count,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     Ok(HttpResponse::Ok().json(movers_list))
 }

@@ -1,5 +1,5 @@
-use crate::client::{error::YahooError, YahooFinanceClient};
-use crate::models::indices::{get_index_regions, Index, MarketIndex, Region};
+use finance_query_core::client::{error::YahooError, FetchClient, YahooFinanceClient};
+use finance_query_core::models::indices::{get_index_regions, Index, MarketIndex, Region};
 use crate::service::quotes;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -201,7 +201,7 @@ async fn parse_yahoo_index(
 /// Fetch a single index
 async fn fetch_index(
     yahoo_client: &YahooFinanceClient,
-    fetch_client: &Arc<crate::client::FetchClient>,
+    fetch_client: &Arc<FetchClient>,
     index: Index,
 ) -> Result<MarketIndex, YahooError> {
     let symbol = get_yahoo_index_symbol(index);
@@ -296,7 +296,7 @@ async fn fetch_index(
 /// Get indices, optionally filtered by specific indices or region
 pub async fn get_indices(
     yahoo_client: &YahooFinanceClient,
-    fetch_client: &Arc<crate::client::FetchClient>,
+    fetch_client: &Arc<FetchClient>,
     indices: Option<Vec<Index>>,
     region: Option<Region>,
 ) -> Result<Vec<MarketIndex>, YahooError> {

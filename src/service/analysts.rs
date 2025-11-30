@@ -1,5 +1,5 @@
-use crate::client::{error::YahooError, YahooFinanceClient};
-use crate::models::analysts::{
+use finance_query_core::client::{error::YahooError, YahooFinanceClient};
+use finance_query_core::models::analysts::{
     AnalysisType, EarningsEstimate, EarningsHistoryItem, PriceTarget, RecommendationData,
     RevenueEstimate, UpgradeDowngrade,
 };

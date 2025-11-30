@@ -1,0 +1,29 @@
+[package]
+name = "finance-query-core"
+version = "0.1.0"
+edition = "2021"
+description = "A Rust client library for Yahoo Finance API - fetch quotes, historical data, financials, and more"
+license = "Apache-2.0"
+repository = "https://github.com/jbradleynh/finance-query-rust"
+keywords = ["yahoo", "finance", "stocks", "api", "trading"]
+categories = ["api-bindings", "finance"]
+readme = "README.md"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+scraper = { workspace = true }
+regex = { workspace = true }
+flate2 = { workspace = true }
+once_cell = { workspace = true }
+url = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.4"

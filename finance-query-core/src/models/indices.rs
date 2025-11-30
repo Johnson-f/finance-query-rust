@@ -61,6 +61,7 @@ pub enum Index {
     #[serde(rename = "ibrx-50")]
     Ibrx50, // Brazil IBrX-50
 
+
     // Europe
     #[serde(rename = "ftse-100")]
     Ftse, // FTSE 100
@@ -192,6 +193,7 @@ pub enum Index {
     Buk100p, // CBOE UK 100
 }
 
+
 impl Index {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -270,6 +272,7 @@ impl Index {
             Index::Buk100p => "cboe-uk-100",
         }
     }
+
 
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
@@ -371,6 +374,7 @@ impl Index {
         ]
     }
 }
+
 
 pub fn get_index_regions() -> HashMap<Index, Region> {
     let mut map = HashMap::new();
@@ -487,4 +491,74 @@ pub struct MarketIndex {
     pub ten_year_return: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "maxReturn")]
     pub max_return: Option<String>,
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn optional_string() -> impl Strategy<Value = Option<String>> {
+        proptest::option::of("[A-Za-z0-9 .%-]{0,20}")
+    }
+
+    // **Feature: crate-extraction, Property 1: Model Serialization Round-Trip**
+    // **Validates: Requirements 2.2**
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn market_index_roundtrip(
+            name in "[A-Za-z0-9 ]{1,30}",
+            value in 0.01f64..100000.0f64,
+            change in "-?[0-9]{1,5}\\.[0-9]{2}",
+            percent_change in "-?[0-9]{1,3}\\.[0-9]{2}%",
+            five_days_return in optional_string(),
+            one_month_return in optional_string(),
+        ) {
+            let index = MarketIndex {
+                name: name.clone(),
+                value,
+                change: change.clone(),
+                percent_change: percent_change.clone(),
+                five_days_return: five_days_return.clone(),
+                one_month_return: one_month_return.clone(),
+                three_month_return: None,
+                six_month_return: None,
+                ytd_return: None,
+                year_return: None,
+                three_year_return: None,
+                five_year_return: None,
+                ten_year_return: None,
+                max_return: None,
+            };
+
+            let json = serde_json::to_string(&index).unwrap();
+            let parsed: MarketIndex = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(index.name, parsed.name);
+            prop_assert!((index.value - parsed.value).abs() < 1e-10);
+            prop_assert_eq!(index.change, parsed.change);
+            prop_assert_eq!(index.percent_change, parsed.percent_change);
+        }
+
+        #[test]
+        fn region_roundtrip(region in prop_oneof![
+            Just(Region::UnitedStates),
+            Just(Region::NorthAmerica),
+            Just(Region::SouthAmerica),
+            Just(Region::Europe),
+            Just(Region::Asia),
+            Just(Region::Africa),
+            Just(Region::MiddleEast),
+            Just(Region::Oceania),
+            Just(Region::Global),
+        ]) {
+            let json = serde_json::to_string(&region).unwrap();
+            let parsed: Region = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(region, parsed);
+        }
+    }
 }

@@ -51,6 +51,7 @@ pub struct MajorHoldersBreakdown {
     pub breakdown_data: HashMap<String, serde_json::Value>,
 }
 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstitutionalHolder {
     pub holder: String,
@@ -180,4 +181,90 @@ pub struct HoldersData {
     pub insider_transactions: Option<Vec<InsiderTransaction>>,
     pub insider_purchases: Option<InsiderPurchase>,
     pub insider_roster: Option<Vec<InsiderRosterMember>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn optional_f64() -> impl Strategy<Value = Option<f64>> {
+        proptest::option::of(0.0f64..100.0f64)
+    }
+
+    fn optional_i64() -> impl Strategy<Value = Option<i64>> {
+        proptest::option::of(0i64..1_000_000_000i64)
+    }
+
+    // **Feature: crate-extraction, Property 1: Model Serialization Round-Trip**
+    // **Validates: Requirements 2.2**
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn holder_type_roundtrip(ht in prop_oneof![
+            Just(HolderType::Major),
+            Just(HolderType::Institutional),
+            Just(HolderType::MutualFund),
+            Just(HolderType::InsiderTransactions),
+            Just(HolderType::InsiderPurchases),
+            Just(HolderType::InsiderRoster),
+        ]) {
+            let json = serde_json::to_string(&ht).unwrap();
+            let parsed: HolderType = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(ht.as_str(), parsed.as_str());
+        }
+
+        #[test]
+        fn institutional_holder_roundtrip(
+            holder in "[A-Za-z ]{1,50}",
+            shares in 0i64..1_000_000_000i64,
+            percent_out in optional_f64(),
+            value in optional_i64(),
+        ) {
+            let ih = InstitutionalHolder {
+                holder: holder.clone(),
+                shares,
+                date_reported: Utc::now(),
+                percent_out,
+                value,
+            };
+
+            let json = serde_json::to_string(&ih).unwrap();
+            let parsed: InstitutionalHolder = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(ih.holder, parsed.holder);
+            prop_assert_eq!(ih.shares, parsed.shares);
+            prop_assert_eq!(ih.value, parsed.value);
+        }
+
+        #[test]
+        fn insider_purchase_roundtrip(
+            period in "[A-Za-z0-9 ]{1,20}",
+            purchases_shares in optional_i64(),
+            sales_shares in optional_i64(),
+        ) {
+            let ip = InsiderPurchase {
+                period: period.clone(),
+                purchases_shares,
+                purchases_transactions: None,
+                sales_shares,
+                sales_transactions: None,
+                net_shares: None,
+                net_transactions: None,
+                total_insider_shares: None,
+                net_percent_insider_shares: None,
+                buy_percent_insider_shares: None,
+                sell_percent_insider_shares: None,
+            };
+
+            let json = serde_json::to_string(&ip).unwrap();
+            let parsed: InsiderPurchase = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(ip.period, parsed.period);
+            prop_assert_eq!(ip.purchases_shares, parsed.purchases_shares);
+            prop_assert_eq!(ip.sales_shares, parsed.sales_shares);
+        }
+    }
 }

@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse, Result};
+use crate::error::IntoWebResult;
 use crate::service;
 use serde::Deserialize;
 
@@ -22,7 +23,8 @@ pub async fn search_handler(
         &query.q,
         query.hits,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     Ok(HttpResponse::Ok().json(results))
 }

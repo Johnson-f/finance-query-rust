@@ -60,6 +60,7 @@ pub struct UpgradeDowngrade {
     pub date: Option<DateTime<Utc>>,
 }
 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceTarget {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -137,4 +138,64 @@ pub struct EarningsHistoryResponse {
     pub symbol: String,
     #[serde(rename = "earningsHistory")]
     pub earnings_history: Vec<EarningsHistoryItem>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn optional_i32() -> impl Strategy<Value = Option<i32>> {
+        proptest::option::of(0i32..1000i32)
+    }
+
+    // **Feature: crate-extraction, Property 1: Model Serialization Round-Trip**
+    // **Validates: Requirements 2.2**
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn recommendation_data_roundtrip(
+            period in "[0-9]{4}-[0-9]{2}",
+            strong_buy in optional_i32(),
+            buy in optional_i32(),
+            hold in optional_i32(),
+            sell in optional_i32(),
+            strong_sell in optional_i32(),
+        ) {
+            let rec = RecommendationData {
+                period: period.clone(),
+                strong_buy,
+                buy,
+                hold,
+                sell,
+                strong_sell,
+            };
+
+            let json = serde_json::to_string(&rec).unwrap();
+            let parsed: RecommendationData = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(rec.period, parsed.period);
+            prop_assert_eq!(rec.strong_buy, parsed.strong_buy);
+            prop_assert_eq!(rec.buy, parsed.buy);
+            prop_assert_eq!(rec.hold, parsed.hold);
+            prop_assert_eq!(rec.sell, parsed.sell);
+            prop_assert_eq!(rec.strong_sell, parsed.strong_sell);
+        }
+
+        #[test]
+        fn analysis_type_roundtrip(at in prop_oneof![
+            Just(AnalysisType::Recommendations),
+            Just(AnalysisType::UpgradesDowngrades),
+            Just(AnalysisType::PriceTargets),
+            Just(AnalysisType::EarningsEstimate),
+            Just(AnalysisType::RevenueEstimate),
+            Just(AnalysisType::EarningsHistory),
+        ]) {
+            let json = serde_json::to_string(&at).unwrap();
+            let parsed: AnalysisType = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(at.as_str(), parsed.as_str());
+        }
+    }
 }

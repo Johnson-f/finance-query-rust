@@ -1,7 +1,7 @@
 use async_graphql::*;
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
-use crate::models::analysts::{
+use finance_query_core::models::analysts::{
     RecommendationData as RecommendationDataModel,
     UpgradeDowngrade as UpgradeDowngradeModel,
     PriceTarget as PriceTargetModel,

@@ -1,7 +1,7 @@
 use async_graphql::*;
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
-use crate::models::holders::{
+use finance_query_core::models::holders::{
     MajorHoldersBreakdown as MajorHoldersBreakdownModel,
     InstitutionalHolder as InstitutionalHolderModel,
     MutualFundHolder as MutualFundHolderModel,

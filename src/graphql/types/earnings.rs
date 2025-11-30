@@ -1,7 +1,7 @@
 use async_graphql::*;
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
-use crate::models::earnings_transcripts::{
+use finance_query_core::models::earnings_transcripts::{
     EarningsCallListing as EarningsCallListingModel,
     EarningsCallsList as EarningsCallsListModel,
     TranscriptSpeaker as TranscriptSpeakerModel,

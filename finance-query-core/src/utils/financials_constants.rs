@@ -1,0 +1,164 @@
+//! Constants for Yahoo Finance fundamentals-timeseries API.
+//! These field names correspond to the 'type' parameter in the Yahoo Finance API.
+
+/// Income statement field names for Yahoo Finance API.
+pub const INCOME_STATEMENT_FIELDS: &[&str] = &[
+    "TotalRevenue",
+    "OperatingRevenue",
+    "CostOfRevenue",
+    "GrossProfit",
+    "OperatingExpense",
+    "SellingGeneralAndAdministration",
+    "ResearchAndDevelopment",
+    "OperatingIncome",
+    "NetInterestIncome",
+    "InterestExpense",
+    "InterestIncome",
+    "NetNonOperatingInterestIncomeExpense",
+    "OtherIncomeExpense",
+    "PretaxIncome",
+    "TaxProvision",
+    "NetIncomeCommonStockholders",
+    "NetIncome",
+    "DilutedEPS",
+    "BasicEPS",
+    "DilutedAverageShares",
+    "BasicAverageShares",
+    "EBIT",
+    "EBITDA",
+    "ReconciledCostOfRevenue",
+    "ReconciledDepreciation",
+    "NetIncomeFromContinuingOperationNetMinorityInterest",
+    "NormalizedEBITDA",
+    "TotalExpenses",
+    "TotalOperatingIncomeAsReported",
+];
+
+/// Balance sheet field names for Yahoo Finance API.
+pub const BALANCE_SHEET_FIELDS: &[&str] = &[
+    "TotalAssets",
+    "CurrentAssets",
+    "CashCashEquivalentsAndShortTermInvestments",
+    "CashAndCashEquivalents",
+    "CashFinancial",
+    "Receivables",
+    "AccountsReceivable",
+    "Inventory",
+    "PrepaidAssets",
+    "OtherCurrentAssets",
+    "TotalNonCurrentAssets",
+    "NetPPE",
+    "GrossPPE",
+    "AccumulatedDepreciation",
+    "Goodwill",
+    "GoodwillAndOtherIntangibleAssets",
+    "OtherIntangibleAssets",
+    "InvestmentsAndAdvances",
+    "LongTermEquityInvestment",
+    "OtherNonCurrentAssets",
+    "TotalLiabilitiesNetMinorityInterest",
+    "CurrentLiabilities",
+    "PayablesAndAccruedExpenses",
+    "AccountsPayable",
+    "CurrentDebt",
+    "CurrentDeferredRevenue",
+    "OtherCurrentLiabilities",
+    "TotalNonCurrentLiabilitiesNetMinorityInterest",
+    "LongTermDebt",
+    "LongTermDebtAndCapitalLeaseObligation",
+    "NonCurrentDeferredRevenue",
+    "NonCurrentDeferredTaxesLiabilities",
+    "OtherNonCurrentLiabilities",
+    "StockholdersEquity",
+    "CommonStockEquity",
+    "CommonStock",
+    "RetainedEarnings",
+    "AdditionalPaidInCapital",
+    "TreasuryStock",
+    "TotalEquityGrossMinorityInterest",
+    "WorkingCapital",
+    "InvestedCapital",
+    "TangibleBookValue",
+    "TotalDebt",
+    "NetDebt",
+    "ShareIssued",
+    "OrdinarySharesNumber",
+];
+
+/// Cash flow statement field names for Yahoo Finance API.
+pub const CASH_FLOW_FIELDS: &[&str] = &[
+    "OperatingCashFlow",
+    "CashFlowFromContinuingOperatingActivities",
+    "NetIncomeFromContinuingOperations",
+    "DepreciationAndAmortization",
+    "DeferredIncomeTax",
+    "ChangeInWorkingCapital",
+    "ChangeInReceivables",
+    "ChangesInAccountReceivables",
+    "ChangeInInventory",
+    "ChangeInAccountPayable",
+    "ChangeInOtherWorkingCapital",
+    "StockBasedCompensation",
+    "OtherNonCashItems",
+    "InvestingCashFlow",
+    "CashFlowFromContinuingInvestingActivities",
+    "NetPPEPurchaseAndSale",
+    "PurchaseOfPPE",
+    "SaleOfPPE",
+    "CapitalExpenditure",
+    "NetBusinessPurchaseAndSale",
+    "PurchaseOfBusiness",
+    "SaleOfBusiness",
+    "NetInvestmentPurchaseAndSale",
+    "PurchaseOfInvestment",
+    "SaleOfInvestment",
+    "NetOtherInvestingChanges",
+    "FinancingCashFlow",
+    "CashFlowFromContinuingFinancingActivities",
+    "NetIssuancePaymentsOfDebt",
+    "NetLongTermDebtIssuance",
+    "LongTermDebtIssuance",
+    "LongTermDebtPayments",
+    "NetShortTermDebtIssuance",
+    "NetCommonStockIssuance",
+    "CommonStockIssuance",
+    "CommonStockPayments",
+    "RepurchaseOfCapitalStock",
+    "CashDividendsPaid",
+    "CommonStockDividendPaid",
+    "NetOtherFinancingCharges",
+    "EndCashPosition",
+    "BeginningCashPosition",
+    "ChangesinCash",
+    "EffectOfExchangeRateChanges",
+    "FreeCashFlow",
+    "CapitalExpenditureReported",
+];
+
+/// Get the list of fields for a given statement type and frequency.
+///
+/// # Arguments
+/// * `statement_type` - One of "income", "balance", "cashflow"
+/// * `frequency` - One of "annual", "quarterly"
+///
+/// # Returns
+/// Vector of field names with frequency prefix (e.g., "annualTotalRevenue")
+///
+/// # Panics
+/// Panics if `statement_type` is not one of "income", "balance", or "cashflow".
+pub fn get_statement_fields(statement_type: &str, frequency: &str) -> Vec<String> {
+    let fields = match statement_type {
+        "income" => INCOME_STATEMENT_FIELDS,
+        "balance" => BALANCE_SHEET_FIELDS,
+        "cashflow" => CASH_FLOW_FIELDS,
+        _ => panic!(
+            "Invalid statement type: {}. Must be one of income, balance, cashflow",
+            statement_type
+        ),
+    };
+
+    fields
+        .iter()
+        .map(|field| format!("{}{}", frequency, field))
+        .collect()
+}

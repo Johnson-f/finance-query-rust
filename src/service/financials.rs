@@ -1,6 +1,6 @@
-use crate::client::YahooFinanceClient;
-use crate::client::error::YahooError;
-use crate::models::{FinancialStatement, StatementType, Frequency};
+use finance_query_core::client::YahooFinanceClient;
+use finance_query_core::client::error::YahooError;
+use finance_query_core::models::{FinancialStatement, StatementType, Frequency};
 use crate::utils::financials_constants::get_statement_fields;
 use serde_json::Value;
 use std::collections::HashMap;

@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::indices::{Index, Region};
+use finance_query_core::models::indices::{Index, Region};
+use crate::error::IntoWebResult;
 use crate::service::indices;
 use serde::Deserialize;
 
@@ -59,7 +60,8 @@ pub async fn get_indices_handler(
         indices,
         region,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     Ok(HttpResponse::Ok().json(indices_list))
 }

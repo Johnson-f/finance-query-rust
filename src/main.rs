@@ -1,7 +1,6 @@
-mod client;
+mod error;
 mod graphql;
 mod middleware;
-mod models;
 mod routes;
 mod service;
 mod utils;
@@ -9,7 +8,7 @@ mod utils;
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
 use async_graphql::{EmptyMutation, Schema};
-use client::{FetchClient, YahooAuthManager, YahooFinanceClient};
+use finance_query_core::{FetchClient, YahooAuthManager, YahooFinanceClient};
 use graphql::{AppContext, Query, Subscription};
 use middleware::rate_limit::RateLimitManager;
 use service::caching::CacheService;

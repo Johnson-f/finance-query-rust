@@ -1,5 +1,5 @@
 use async_graphql::*;
-use crate::models::search::{SearchResult as SearchResultModel, SearchResponse as SearchResponseModel};
+use finance_query_core::models::search::{SearchResult as SearchResultModel, SearchResponse as SearchResponseModel};
 
 #[derive(SimpleObject, Clone)]
 pub struct SearchResult {

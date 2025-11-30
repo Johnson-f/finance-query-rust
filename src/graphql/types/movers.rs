@@ -1,5 +1,5 @@
 use async_graphql::*;
-use crate::models::movers::MarketMover as MarketMoverModel;
+use finance_query_core::models::movers::MarketMover as MarketMoverModel;
 
 #[derive(SimpleObject, Clone)]
 pub struct MarketMover {

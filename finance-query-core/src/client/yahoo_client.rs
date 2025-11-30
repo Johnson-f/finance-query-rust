@@ -1,17 +1,30 @@
+//! Yahoo Finance API client.
+//!
+//! This module provides the main client for interacting with Yahoo Finance APIs.
+
 use crate::client::error::YahooError;
+use crate::client::fetch_client::FetchClient;
 use crate::client::yahoo_auth::YahooAuthManager;
-use crate::client::FetchClient;
 use reqwest::cookie::CookieStore;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
+/// Main client for Yahoo Finance API requests.
+///
+/// This client handles authenticated requests to Yahoo Finance,
+/// automatically managing crumb tokens and retrying on auth failures.
 pub struct YahooFinanceClient {
     auth_manager: Arc<YahooAuthManager>,
     fetch_client: Arc<FetchClient>,
 }
 
 impl YahooFinanceClient {
+    /// Create a new YahooFinanceClient.
+    ///
+    /// # Arguments
+    /// * `auth_manager` - Shared authentication manager
+    /// * `fetch_client` - Shared HTTP client
     pub fn new(auth_manager: Arc<YahooAuthManager>, fetch_client: Arc<FetchClient>) -> Self {
         Self {
             auth_manager,
@@ -29,7 +42,10 @@ impl YahooFinanceClient {
             Ok(response) => Ok(response),
             Err(YahooError::AuthFailed(msg)) => {
                 // Got 401, force refresh and retry once
-                warn!("Got 401 Unauthorized: {}. Forcing auth refresh and retrying once", msg);
+                warn!(
+                    "Got 401 Unauthorized: {}. Forcing auth refresh and retrying once",
+                    msg
+                );
                 self.auth_manager.refresh().await?;
                 info!("Auth refreshed, retrying request");
                 self.yahoo_request_inner(url, params).await
@@ -37,6 +53,7 @@ impl YahooFinanceClient {
             Err(e) => Err(e),
         }
     }
+
 
     async fn yahoo_request_inner(
         &self,
@@ -46,15 +63,19 @@ impl YahooFinanceClient {
         debug!("Getting crumb for Yahoo request");
         let (cookie_jar, crumb) = self.auth_manager.get_or_refresh().await?;
         debug!("Got crumb (length: {}): {}", crumb.len(), &crumb);
-        
+
         // Log cookies for debugging
         if let Ok(url_parsed) = url::Url::parse(url) {
             if let Some(cookie_header) = cookie_jar.cookies(&url_parsed) {
                 if let Ok(cookie_str) = cookie_header.to_str() {
                     let cookie_count = cookie_str.split(';').count();
-                    debug!("Using {} cookies for request to {}", cookie_count, url_parsed.host_str().unwrap_or("unknown"));
+                    debug!(
+                        "Using {} cookies for request to {}",
+                        cookie_count,
+                        url_parsed.host_str().unwrap_or("unknown")
+                    );
                     debug!("Cookie header length: {} bytes", cookie_str.len());
-                    
+
                     // Log individual cookie names (not values for security)
                     for cookie in cookie_str.split(';') {
                         if let Some(name) = cookie.trim().split('=').next() {
@@ -65,7 +86,10 @@ impl YahooFinanceClient {
                     warn!("Could not read cookie header");
                 }
             } else {
-                warn!("No cookies found in jar for {}", url_parsed.host_str().unwrap_or("unknown"));
+                warn!(
+                    "No cookies found in jar for {}",
+                    url_parsed.host_str().unwrap_or("unknown")
+                );
             }
         }
 
@@ -78,7 +102,10 @@ impl YahooFinanceClient {
 
         // Add proxy configuration if available
         if let Some(proxy_url) = self.fetch_client.auth_proxy() {
-            debug!("Using proxy for Yahoo API request: {}...", &proxy_url.chars().take(30).collect::<String>());
+            debug!(
+                "Using proxy for Yahoo API request: {}...",
+                &proxy_url.chars().take(30).collect::<String>()
+            );
             builder = builder
                 .proxy(reqwest::Proxy::all(proxy_url).map_err(YahooError::NetworkError)?)
                 .danger_accept_invalid_certs(true);
@@ -106,13 +133,15 @@ impl YahooFinanceClient {
 
         let status = response.status();
         debug!("Yahoo API response status: {}", status);
-        
+
         if status == 401 {
             error!("Yahoo API returned 401 Unauthorized. Crumb may be invalid or expired.");
             // Log response body for debugging
             if let Ok(body) = response.text().await {
-                debug!("401 response body (first 200 chars): {}", 
-                    body.chars().take(200).collect::<String>());
+                debug!(
+                    "401 response body (first 200 chars): {}",
+                    body.chars().take(200).collect::<String>()
+                );
             }
             return Err(YahooError::AuthFailed("Yahoo auth failed".to_string()));
         }
@@ -125,12 +154,17 @@ impl YahooFinanceClient {
         if !status.is_success() {
             return Err(YahooError::HttpError(
                 status.as_u16(),
-                format!("HTTP {}: {}", status, response.status().canonical_reason().unwrap_or("Unknown")),
+                format!(
+                    "HTTP {}: {}",
+                    status,
+                    response.status().canonical_reason().unwrap_or("Unknown")
+                ),
             ));
         }
 
         Ok(response)
     }
+
 
     async fn json(
         &self,
@@ -146,13 +180,22 @@ impl YahooFinanceClient {
         info!("Received response with status: {}", status);
         let text = response.text().await.map_err(YahooError::NetworkError)?;
         debug!("Response text length: {} bytes", text.len());
-        debug!("Response preview (first 500 chars): {}", &text.chars().take(500).collect::<String>());
+        debug!(
+            "Response preview (first 500 chars): {}",
+            &text.chars().take(500).collect::<String>()
+        );
         serde_json::from_str(&text).map_err(|e| {
-            error!("Failed to parse JSON response from {}: {}. Response text: {}", url, e, &text.chars().take(200).collect::<String>());
+            error!(
+                "Failed to parse JSON response from {}: {}. Response text: {}",
+                url,
+                e,
+                &text.chars().take(200).collect::<String>()
+            );
             YahooError::ParseError(format!("Failed to parse JSON response from {}: {}", url, e))
         })
     }
 
+    /// Get detailed quote data for a symbol.
     pub async fn get_quote(&self, symbol: &str) -> Result<Value, YahooError> {
         let url = format!(
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{}",
@@ -165,6 +208,7 @@ impl YahooFinanceClient {
         self.json(&url, Some(&params)).await
     }
 
+    /// Get simple quote data for multiple symbols.
     pub async fn get_simple_quotes(&self, symbols: &[&str]) -> Result<Value, YahooError> {
         info!("Fetching simple quotes for symbols: {:?}", symbols);
         let url = "https://query1.finance.yahoo.com/v7/finance/quote";
@@ -174,7 +218,10 @@ impl YahooFinanceClient {
         match &result {
             Ok(data) => {
                 info!("Successfully received quote data");
-                debug!("Quote data keys: {:?}", data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+                debug!(
+                    "Quote data keys: {:?}",
+                    data.as_object().map(|o| o.keys().collect::<Vec<_>>())
+                );
             }
             Err(e) => {
                 error!("Failed to fetch simple quotes: {}", e);
@@ -183,18 +230,22 @@ impl YahooFinanceClient {
         result
     }
 
+    /// Get chart data for a symbol.
     pub async fn get_chart(
         &self,
         symbol: &str,
         interval: &str,
         range: &str,
     ) -> Result<Value, YahooError> {
-        let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{}", symbol);
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}",
+            symbol
+        );
         let params = [("interval", interval), ("range", range)];
         self.json(&url, Some(&params)).await
     }
 
-    /// Get chart data using period1 and period2 (Unix timestamps) instead of range
+    /// Get chart data using period1 and period2 (Unix timestamps) instead of range.
     pub async fn get_chart_with_periods(
         &self,
         symbol: &str,
@@ -202,7 +253,10 @@ impl YahooFinanceClient {
         period1: i64,
         period2: i64,
     ) -> Result<Value, YahooError> {
-        let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{}", symbol);
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}",
+            symbol
+        );
         let params = [
             ("interval", interval),
             ("period1", &period1.to_string()),
@@ -211,15 +265,14 @@ impl YahooFinanceClient {
         self.json(&url, Some(&params)).await
     }
 
+    /// Search for symbols.
     pub async fn search(&self, query: &str, hits: usize) -> Result<Value, YahooError> {
         let url = "https://query1.finance.yahoo.com/v1/finance/search";
-        let params = [
-            ("q", query),
-            ("quotesCount", &hits.to_string()),
-        ];
+        let params = [("q", query), ("quotesCount", &hits.to_string())];
         self.json(url, Some(&params)).await
     }
 
+    /// Get similar/recommended quotes for a symbol.
     pub async fn get_similar_quotes(&self, symbol: &str, limit: usize) -> Result<Value, YahooError> {
         let url = format!(
             "https://query2.finance.yahoo.com/v6/finance/recommendationsbysymbol/{}",
@@ -230,6 +283,8 @@ impl YahooFinanceClient {
         self.json(&url, Some(&params)).await
     }
 
+
+    /// Get fundamentals timeseries data.
     pub async fn get_fundamentals_timeseries(
         &self,
         symbol: &str,
@@ -256,6 +311,7 @@ impl YahooFinanceClient {
         self.json(&url, Some(&params)).await
     }
 
+    /// Get quote summary with specified modules.
     pub async fn get_quote_summary(
         &self,
         symbol: &str,
@@ -274,11 +330,16 @@ impl YahooFinanceClient {
         self.json(&url, Some(&params)).await
     }
 
+    /// Get quote type information.
     pub async fn get_quote_type(&self, symbol: &str) -> Result<Value, YahooError> {
-        let url = format!("https://query1.finance.yahoo.com/v1/finance/quoteType/{}", symbol);
+        let url = format!(
+            "https://query1.finance.yahoo.com/v1/finance/quoteType/{}",
+            symbol
+        );
         self.json(&url, None).await
     }
 
+    /// Get earnings transcript.
     pub async fn get_earnings_transcript(
         &self,
         event_id: &str,
@@ -294,8 +355,9 @@ impl YahooFinanceClient {
         ];
         self.json(url, Some(&params)).await
     }
-    /// Make a Yahoo Finance API request and return the raw response
-    /// This is useful for endpoints that need custom handling
+
+    /// Make a Yahoo Finance API request and return the raw response.
+    /// This is useful for endpoints that need custom handling.
     pub async fn make_request(
         &self,
         url: &str,

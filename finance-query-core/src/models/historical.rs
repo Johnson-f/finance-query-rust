@@ -70,6 +70,7 @@ impl TimeRange {
     }
 }
 
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Interval {
@@ -141,4 +142,104 @@ pub struct HistoricalData {
 #[serde(rename_all = "snake_case")]
 pub struct HistoricalResponse {
     pub data: std::collections::HashMap<String, HistoricalData>,
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    // Helper function to compare f64 values with tolerance for JSON round-trip
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-10
+    }
+
+    fn approx_eq_opt(a: Option<f64>, b: Option<f64>) -> bool {
+        match (a, b) {
+            (Some(x), Some(y)) => approx_eq(x, y),
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
+    // **Feature: crate-extraction, Property 1: Model Serialization Round-Trip**
+    // **Validates: Requirements 2.2**
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn historical_data_roundtrip(
+            open in 0.01f64..10000.0f64,
+            high in 0.01f64..10000.0f64,
+            low in 0.01f64..10000.0f64,
+            close in 0.01f64..10000.0f64,
+            volume in 0i64..1_000_000_000i64,
+            adj_close in proptest::option::of(0.01f64..10000.0f64),
+        ) {
+            let data = HistoricalData {
+                open,
+                high,
+                low,
+                close,
+                volume,
+                adj_close,
+                sma: None,
+                ema: None,
+            };
+
+            let json = serde_json::to_string(&data).unwrap();
+            let parsed: HistoricalData = serde_json::from_str(&json).unwrap();
+
+            // Use approximate comparison for f64 due to JSON serialization precision limits
+            prop_assert!(approx_eq(data.open, parsed.open), "open mismatch");
+            prop_assert!(approx_eq(data.high, parsed.high), "high mismatch");
+            prop_assert!(approx_eq(data.low, parsed.low), "low mismatch");
+            prop_assert!(approx_eq(data.close, parsed.close), "close mismatch");
+            prop_assert_eq!(data.volume, parsed.volume);
+            prop_assert!(approx_eq_opt(data.adj_close, parsed.adj_close), "adj_close mismatch");
+        }
+
+        #[test]
+        fn time_range_roundtrip(range in prop_oneof![
+            Just(TimeRange::Day),
+            Just(TimeRange::FiveDays),
+            Just(TimeRange::OneMonth),
+            Just(TimeRange::ThreeMonths),
+            Just(TimeRange::SixMonths),
+            Just(TimeRange::Year),
+            Just(TimeRange::TwoYears),
+            Just(TimeRange::FiveYears),
+            Just(TimeRange::TenYears),
+            Just(TimeRange::Ytd),
+            Just(TimeRange::Max),
+        ]) {
+            let json = serde_json::to_string(&range).unwrap();
+            let parsed: TimeRange = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(range.as_str(), parsed.as_str());
+        }
+
+        #[test]
+        fn interval_roundtrip(interval in prop_oneof![
+            Just(Interval::OneMinute),
+            Just(Interval::ThreeMinutes),
+            Just(Interval::FiveMinutes),
+            Just(Interval::TenMinutes),
+            Just(Interval::FifteenMinutes),
+            Just(Interval::TwentyMinutes),
+            Just(Interval::ThirtyMinutes),
+            Just(Interval::SixtyFiveMinutes),
+            Just(Interval::NinetyFiveMinutes),
+            Just(Interval::OneHour),
+            Just(Interval::Daily),
+            Just(Interval::Weekly),
+            Just(Interval::Monthly),
+        ]) {
+            let json = serde_json::to_string(&interval).unwrap();
+            let parsed: Interval = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(interval.as_str(), parsed.as_str());
+        }
+    }
 }

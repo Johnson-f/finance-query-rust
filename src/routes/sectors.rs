@@ -1,12 +1,13 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::sectors::Sector;
+use finance_query_core::models::sectors::Sector;
+use crate::error::IntoWebResult;
 use crate::service;
 use std::str::FromStr;
 
 pub async fn get_sectors_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
-    let sectors = service::get_sectors(&app_state.fetch_client).await?;
+    let sectors = service::get_sectors(&app_state.fetch_client).await.into_web_result()?;
     Ok(HttpResponse::Ok().json(sectors))
 }
 
@@ -20,7 +21,8 @@ pub async fn get_sector_for_symbol_handler(
         &app_state.fetch_client,
         &symbol,
     )
-    .await?;
+    .await
+    .into_web_result()?;
     Ok(HttpResponse::Ok().json(sector))
 }
 
@@ -32,7 +34,7 @@ pub async fn get_sector_details_handler(
     let sector = Sector::from_str(&sector_str)
         .map_err(|e| actix_web::error::ErrorBadRequest(format!("Invalid sector: {}", e)))?;
     
-    let details = service::get_sector_details(&app_state.fetch_client, sector).await?;
+    let details = service::get_sector_details(&app_state.fetch_client, sector).await.into_web_result()?;
     Ok(HttpResponse::Ok().json(details))
 }
 

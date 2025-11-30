@@ -1,5 +1,5 @@
 use async_graphql::*;
-use crate::models::indices::MarketIndex as MarketIndexModel;
+use finance_query_core::models::indices::MarketIndex as MarketIndexModel;
 
 #[derive(SimpleObject, Clone)]
 pub struct MarketIndex {

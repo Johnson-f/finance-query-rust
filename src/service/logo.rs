@@ -1,5 +1,5 @@
-use crate::client::error::YahooError;
-use crate::client::FetchClient;
+use finance_query_core::client::error::YahooError;
+use finance_query_core::client::FetchClient;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};

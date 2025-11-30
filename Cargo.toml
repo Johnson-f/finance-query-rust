@@ -1,33 +1,86 @@
+[workspace]
+members = [".", "finance-query-core"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["cookies", "json", "gzip", "brotli"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.9"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# HTML parsing
+scraper = "0.19"
+
+# Regex
+regex = "1"
+
+# Compression
+flate2 = "1.0"
+
+# Utilities
+once_cell = "1"
+url = "2.5"
+
+# Logging
+tracing = "0.1"
+
+# Async utilities
+futures-util = "0.3"
+async-stream = "0.3"
+tokio-stream = "0.1"
+
 [package]
 name = "finance-query-rust"
 version = "2.0.9"
 edition = "2024"
 
 [dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+scraper = { workspace = true }
+regex = { workspace = true }
+flate2 = { workspace = true }
+once_cell = { workspace = true }
+url = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+async-stream = { workspace = true }
+tokio-stream = { workspace = true }
+
+# Web framework (main app only)
 actix-web = { version = "4", features = ["macros"] }
-tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.11", features = ["cookies", "json", "gzip", "brotli"] }
-flate2 = "1.0"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-scraper = "0.19"
-regex = "1"
-chrono = { version = "0.4", features = ["serde"] }
-anyhow = "1"
-thiserror = "1"
 actix-cors = "0.7"
 actix-ws = "0.3"
 actix = "0.13"
-tokio-stream = "0.1"
-futures-util = "0.3"
-chrono-tz = "0.9"
-tracing = "0.1"
 tracing-actix-web = "0.7"
 tracing-subscriber = "0.3"
-once_cell = "1"
-url = "2.5"
+
+# Redis caching (main app only)
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 dotenv = "0.15"
+
+# GraphQL (main app only)
 async-graphql = { version = "7", features = ["chrono", "chrono-tz"] }
 async-graphql-actix-web = "7"
-async-stream = "0.3"
+
+# Core crate
+finance-query-core = { path = "finance-query-core" }

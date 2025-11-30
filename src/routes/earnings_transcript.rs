@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse, Result};
+use crate::error::IntoWebResult;
 use crate::service;
 use crate::service::caching::{earnings_transcript_key, TTL_EARNINGS_TRANSCRIPT};
 use serde::Deserialize;
@@ -30,7 +31,8 @@ pub async fn get_earnings_calls_handler(
         &app_state.fetch_client,
         &symbol,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     // Cache the result
     let calls_json: Value = serde_json::to_value(&calls)
@@ -65,7 +67,8 @@ pub async fn get_earnings_transcript_handler(
         query.quarter.clone(),
         query.year,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     // Cache the result
     let transcript_json: Value = serde_json::to_value(&transcript)

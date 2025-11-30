@@ -1,7 +1,7 @@
-use crate::client::{scraper, YahooFinanceClient};
-use crate::client::error::YahooError;
-use crate::client::FetchClient;
-use crate::models::{
+use finance_query_core::client::{scraper, YahooFinanceClient};
+use finance_query_core::client::error::YahooError;
+use finance_query_core::client::FetchClient;
+use finance_query_core::models::{
     EarningsCallListing, EarningsCallsList, EarningsTranscript, TranscriptParagraph, TranscriptSpeaker,
 };
 use chrono::{DateTime, Utc};

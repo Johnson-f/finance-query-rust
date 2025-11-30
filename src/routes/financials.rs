@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse, Result};
-use crate::models::{StatementType, Frequency};
+use finance_query_core::models::{StatementType, Frequency};
+use crate::error::IntoWebResult;
 use crate::service;
 use crate::service::caching::{financials_key, TTL_FINANCIALS};
 use serde::Deserialize;
@@ -37,7 +38,8 @@ pub async fn get_financials_handler(
         statement_type,
         frequency,
     )
-    .await?;
+    .await
+    .into_web_result()?;
 
     // Cache the result
     let financials_json: Value = serde_json::to_value(&financials)

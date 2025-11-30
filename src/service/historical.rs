@@ -1,7 +1,7 @@
-use crate::client::YahooFinanceClient;
-use crate::client::error::YahooError;
-use crate::models::{HistoricalData, HistoricalResponse, TimeRange, Interval};
-use crate::models::historical::IndicatorType;
+use finance_query_core::client::YahooFinanceClient;
+use finance_query_core::client::error::YahooError;
+use finance_query_core::models::{HistoricalData, HistoricalResponse, TimeRange, Interval};
+use finance_query_core::models::historical::IndicatorType;
 use crate::service::websocket::indicator::price_buffer::PricePoint;
 use crate::service::websocket::indicator::moving_average::{MovingAverageType, calculate_ma_series};
 use serde_json::Value;

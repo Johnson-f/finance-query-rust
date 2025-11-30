@@ -1,6 +1,6 @@
 use async_graphql::*;
 use std::collections::HashMap;
-use crate::models::financials::{
+use finance_query_core::models::financials::{
     FinancialStatement as FinancialStatementModel,
     StatementType as StatementTypeModel,
     Frequency as FrequencyModel,

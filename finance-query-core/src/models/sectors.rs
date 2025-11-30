@@ -57,6 +57,7 @@ impl Sector {
         }
     }
 
+
     #[allow(dead_code)]
     pub fn all() -> Vec<Sector> {
         vec![
@@ -134,4 +135,63 @@ pub struct MarketSectorDetails {
     pub top_industries: Vec<String>,
     #[serde(rename = "topCompanies")]
     pub top_companies: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    // **Feature: crate-extraction, Property 1: Model Serialization Round-Trip**
+    // **Validates: Requirements 2.2**
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn market_sector_roundtrip(
+            sector in "[A-Za-z ]{1,30}",
+            day_return in "-?[0-9]{1,3}\\.[0-9]{2}%",
+            ytd_return in "-?[0-9]{1,3}\\.[0-9]{2}%",
+            year_return in "-?[0-9]{1,3}\\.[0-9]{2}%",
+            three_year_return in "-?[0-9]{1,3}\\.[0-9]{2}%",
+            five_year_return in "-?[0-9]{1,3}\\.[0-9]{2}%",
+        ) {
+            let ms = MarketSector {
+                sector: sector.clone(),
+                day_return: day_return.clone(),
+                ytd_return: ytd_return.clone(),
+                year_return: year_return.clone(),
+                three_year_return: three_year_return.clone(),
+                five_year_return: five_year_return.clone(),
+            };
+
+            let json = serde_json::to_string(&ms).unwrap();
+            let parsed: MarketSector = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(ms.sector, parsed.sector);
+            prop_assert_eq!(ms.day_return, parsed.day_return);
+            prop_assert_eq!(ms.ytd_return, parsed.ytd_return);
+            prop_assert_eq!(ms.year_return, parsed.year_return);
+        }
+
+        #[test]
+        fn sector_roundtrip(sector in prop_oneof![
+            Just(Sector::BasicMaterials),
+            Just(Sector::Communication),
+            Just(Sector::ConsumerCyclical),
+            Just(Sector::ConsumerDefensive),
+            Just(Sector::Energy),
+            Just(Sector::FinancialServices),
+            Just(Sector::Healthcare),
+            Just(Sector::Industrials),
+            Just(Sector::RealEstate),
+            Just(Sector::Technology),
+            Just(Sector::Utilities),
+        ]) {
+            let json = serde_json::to_string(&sector).unwrap();
+            let parsed: Sector = serde_json::from_str(&json).unwrap();
+
+            prop_assert_eq!(sector.as_str(), parsed.as_str());
+        }
+    }
 }

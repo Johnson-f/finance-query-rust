@@ -32,3 +32,6 @@ vendor/
 
 # GitHub Pages
 .github/workflows/pages.yml.bak
+
+.env.production
+

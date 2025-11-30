@@ -1,5 +1,5 @@
-use crate::client::{error::YahooError, YahooFinanceClient};
-use crate::models::holders::{
+use finance_query_core::client::{error::YahooError, YahooFinanceClient};
+use finance_query_core::models::holders::{
     HoldersData, HolderType, InsiderPurchase, InsiderRosterMember, InsiderTransaction,
     InstitutionalHolder, MajorHoldersBreakdown, MutualFundHolder,
 };
