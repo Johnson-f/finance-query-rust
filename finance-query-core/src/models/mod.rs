@@ -9,6 +9,13 @@ pub mod holders;
 pub mod analysts;
 pub mod sectors;
 pub mod earnings_transcripts;
+pub mod actions;
+pub mod options;
+pub mod calendar;
+pub mod sec_filings;
+pub mod sustainability;
+pub mod industry;
+pub mod market;
 
 // Quote models
 pub use quote::{Quote, SimpleQuote, DetailedQuote};
@@ -46,6 +53,8 @@ pub use analysts::{
     EarningsEstimate, RevenueEstimate, EarningsHistoryItem,
     RecommendationsResponse, UpgradesDowngradesResponse, PriceTargetsResponse,
     EarningsEstimateResponse, RevenueEstimateResponse, EarningsHistoryResponse,
+    EpsTrend, EpsRevisions, GrowthEstimate,
+    EpsTrendResponse, EpsRevisionsResponse, GrowthEstimatesResponse,
 };
 
 // Sectors models
@@ -56,3 +65,24 @@ pub use earnings_transcripts::{
     Quarter, EarningsCallListing, EarningsCallsList, TranscriptSpeaker,
     TranscriptParagraph, EarningsTranscript,
 };
+
+// Actions models
+pub use actions::{ActionsResponse, Dividend, StockSplit, CapitalGain};
+
+// Options models
+pub use options::{OptionChain, OptionContract, OptionExpirations};
+
+// Calendar models
+pub use calendar::Calendar;
+
+// SEC filings models
+pub use sec_filings::{SecFiling, SecFilingsResponse, SecExhibit};
+
+// Sustainability/ESG models
+pub use sustainability::SustainabilityScores;
+
+// Industry models
+pub use industry::{Industry, IndustryCompany};
+
+// Market models
+pub use market::{MarketStatus, MarketSummaryItem, MarketSummaryResponse};

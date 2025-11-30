@@ -480,6 +480,89 @@ match client.get_quote("INVALID").await {
 }
 ```
 
+## New Features (v0.2)
+
+### Stock Actions (Dividends, Splits, Capital Gains)
+
+```rust
+// Get all stock actions
+let actions = client.get_actions("AAPL", "5y").await?;
+println!("Total dividends: ${:.2}", actions.total_dividends());
+
+// Get just dividends
+let dividends = client.get_dividends("AAPL", "1y").await?;
+for div in &dividends {
+    println!("{}: ${:.4}", div.date.format("%Y-%m-%d"), div.amount);
+}
+
+// Get stock splits
+let splits = client.get_splits("AAPL", "max").await?;
+```
+
+### Options Data
+
+```rust
+// Get option expirations
+let expirations = client.get_option_expirations("AAPL").await?;
+
+// Get option chain for specific expiration
+let chain = client.get_option_chain("AAPL", Some("2025-12-19")).await?;
+for call in &chain.calls {
+    println!("Strike: ${:.2}, IV: {:.2}%", call.strike, call.implied_volatility * 100.0);
+}
+```
+
+### Calendar Events
+
+```rust
+let calendar = client.get_calendar("AAPL").await?;
+if let Some(date) = calendar.earnings_date {
+    println!("Next earnings: {}", date.format("%Y-%m-%d"));
+}
+```
+
+### SEC Filings
+
+```rust
+let filings = client.get_sec_filings("AAPL").await?;
+for filing in &filings.filings {
+    println!("{}: {} - {}", filing.date.format("%Y-%m-%d"), filing.filing_type, filing.title);
+}
+```
+
+### ESG/Sustainability Scores
+
+```rust
+let esg = client.get_sustainability("AAPL").await?;
+if let Some(score) = esg.total_esg {
+    println!("ESG Score: {:.1} (Rating: {})", score, esg.rating().unwrap_or("N/A"));
+}
+```
+
+### Industry Data
+
+```rust
+let industry = client.get_industry("technology-hardware").await?;
+println!("Industry: {} (Sector: {:?})", industry.name, industry.sector_name);
+for company in &industry.top_performing_companies {
+    println!("  {} ({})", company.name, company.symbol);
+}
+```
+
+### Market Status & Summary
+
+```rust
+// Check if market is open
+let status = client.get_market_status("us_market").await?;
+println!("Market is {}", if status.is_open() { "open" } else { "closed" });
+
+// Get market summary with indices
+let summary = client.get_market_summary("us_market").await?;
+for index in &summary.indices {
+    println!("{}: {:.2} ({:+.2}%)", index.short_name, index.price, index.percent_change);
+}
+```
+
 ## License
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

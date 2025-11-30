@@ -365,4 +365,359 @@ impl YahooFinanceClient {
     ) -> Result<reqwest::Response, YahooError> {
         self.yahoo_request(url, params).await
     }
+
+    /// Get stock actions (dividends, splits, capital gains) for a symbol
+    ///
+    /// # Arguments
+    /// * `symbol` - The stock symbol
+    /// * `period` - Time period (e.g., "max", "5y", "1y")
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let actions = client.get_actions("AAPL", "max").await?;
+    /// println!("Total dividends: {}", actions.total_dividends());
+    /// ```
+    pub async fn get_actions(
+        &self,
+        symbol: &str,
+        period: &str,
+    ) -> Result<crate::models::ActionsResponse, YahooError> {
+        use crate::models::actions::{ActionsResponse, YahooEventsResponse};
+
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}",
+            symbol
+        );
+
+        let params = [
+            ("interval", "1d"),
+            ("range", period),
+            ("events", "div,split,capitalGains"),
+        ];
+
+        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooEventsResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse actions response: {}", e))
+        })?;
+
+        ActionsResponse::from_yahoo_response(symbol.to_string(), yahoo_response)
+    }
+
+    /// Get only dividends for a symbol
+    pub async fn get_dividends(
+        &self,
+        symbol: &str,
+        period: &str,
+    ) -> Result<Vec<crate::models::Dividend>, YahooError> {
+        let actions = self.get_actions(symbol, period).await?;
+        Ok(actions.dividends)
+    }
+
+    /// Get only stock splits for a symbol
+    pub async fn get_splits(
+        &self,
+        symbol: &str,
+        period: &str,
+    ) -> Result<Vec<crate::models::StockSplit>, YahooError> {
+        let actions = self.get_actions(symbol, period).await?;
+        Ok(actions.splits)
+    }
+
+    /// Get only capital gains for a symbol
+    pub async fn get_capital_gains(
+        &self,
+        symbol: &str,
+        period: &str,
+    ) -> Result<Vec<crate::models::CapitalGain>, YahooError> {
+        let actions = self.get_actions(symbol, period).await?;
+        Ok(actions.capital_gains)
+    }
+
+    /// Get option chain for a symbol and expiration date
+    ///
+    /// # Arguments
+    /// * `symbol` - The stock symbol
+    /// * `date` - Optional expiration date (YYYY-MM-DD). If None, returns nearest expiration
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let chain = client.get_option_chain("AAPL", Some("2025-12-19")).await?;
+    /// println!("Calls: {}, Puts: {}", chain.calls.len(), chain.puts.len());
+    /// ```
+    pub async fn get_option_chain(
+        &self,
+        symbol: &str,
+        date: Option<&str>,
+    ) -> Result<crate::models::OptionChain, YahooError> {
+        use crate::models::options::{date_to_timestamp, OptionChain, YahooOptionsResponse};
+
+        let url = format!(
+            "https://query2.finance.yahoo.com/v7/finance/options/{}",
+            symbol
+        );
+
+        let response = if let Some(exp_date) = date {
+            // Convert date to Unix timestamp
+            let timestamp = date_to_timestamp(exp_date)?;
+            let timestamp_str = timestamp.to_string();
+            let params = [("date", timestamp_str.as_str())];
+            self.yahoo_request(&url, Some(&params)).await?
+        } else {
+            self.yahoo_request(&url, None).await?
+        };
+
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+        let yahoo_response: YahooOptionsResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse options response: {}", e))
+        })?;
+
+        let expiration_date = date.unwrap_or("nearest").to_string();
+        OptionChain::from_yahoo_response(symbol.to_string(), expiration_date, yahoo_response)
+    }
+
+    /// Get all available option expiration dates for a symbol
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let expirations = client.get_option_expirations("AAPL").await?;
+    /// for exp in &expirations.expirations {
+    ///     println!("Expiration: {}", exp);
+    /// }
+    /// ```
+    pub async fn get_option_expirations(
+        &self,
+        symbol: &str,
+    ) -> Result<crate::models::OptionExpirations, YahooError> {
+        use crate::models::options::{OptionExpirations, YahooOptionsResponse};
+
+        let url = format!(
+            "https://query2.finance.yahoo.com/v7/finance/options/{}",
+            symbol
+        );
+
+        let response = self.yahoo_request(&url, None).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooOptionsResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse options response: {}", e))
+        })?;
+
+        OptionExpirations::from_yahoo_response(symbol.to_string(), yahoo_response)
+    }
+
+    /// Get calendar events (earnings dates, dividend dates) for a symbol
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let calendar = client.get_calendar("AAPL").await?;
+    /// if let Some(date) = calendar.earnings_date {
+    ///     println!("Next earnings: {}", date);
+    /// }
+    /// ```
+    pub async fn get_calendar(
+        &self,
+        symbol: &str,
+    ) -> Result<crate::models::Calendar, YahooError> {
+        use crate::models::calendar::{Calendar, YahooCalendarResponse};
+
+        let url = format!(
+            "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{}",
+            symbol
+        );
+
+        let params = [
+            ("modules", "calendarEvents"),
+            ("corsDomain", "finance.yahoo.com"),
+            ("formatted", "false"),
+        ];
+
+        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooCalendarResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse calendar response: {}", e))
+        })?;
+
+        Calendar::from_yahoo_response(symbol.to_string(), yahoo_response)
+    }
+
+    /// Get SEC filings for a symbol
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let filings = client.get_sec_filings("AAPL").await?;
+    /// for filing in &filings.filings {
+    ///     println!("{}: {} - {}", filing.date, filing.filing_type, filing.title);
+    /// }
+    /// ```
+    pub async fn get_sec_filings(
+        &self,
+        symbol: &str,
+    ) -> Result<crate::models::SecFilingsResponse, YahooError> {
+        use crate::models::sec_filings::{SecFilingsResponse, YahooSecFilingsResponse};
+
+        let url = format!(
+            "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{}",
+            symbol
+        );
+
+        let params = [
+            ("modules", "secFilings"),
+            ("corsDomain", "finance.yahoo.com"),
+            ("formatted", "false"),
+        ];
+
+        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooSecFilingsResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse SEC filings response: {}", e))
+        })?;
+
+        SecFilingsResponse::from_yahoo_response(symbol.to_string(), yahoo_response)
+    }
+
+    /// Get ESG/Sustainability scores for a symbol
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let esg = client.get_sustainability("AAPL").await?;
+    /// if let Some(score) = esg.total_esg {
+    ///     println!("ESG Score: {:.1} (Rating: {})", score, esg.rating().unwrap_or("N/A"));
+    /// }
+    /// ```
+    pub async fn get_sustainability(
+        &self,
+        symbol: &str,
+    ) -> Result<crate::models::SustainabilityScores, YahooError> {
+        use crate::models::sustainability::{SustainabilityScores, YahooEsgResponse};
+
+        let url = format!(
+            "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{}",
+            symbol
+        );
+
+        let params = [
+            ("modules", "esgScores"),
+            ("corsDomain", "finance.yahoo.com"),
+            ("formatted", "false"),
+        ];
+
+        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooEsgResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse ESG response: {}", e))
+        })?;
+
+        SustainabilityScores::from_yahoo_response(symbol.to_string(), yahoo_response)
+    }
+
+    /// Get industry data including top performing and growth companies
+    ///
+    /// # Arguments
+    /// * `industry_key` - The industry key (e.g., "technology-hardware")
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let industry = client.get_industry("technology-hardware").await?;
+    /// println!("Industry: {} (Sector: {:?})", industry.name, industry.sector_name);
+    /// ```
+    pub async fn get_industry(
+        &self,
+        industry_key: &str,
+    ) -> Result<crate::models::Industry, YahooError> {
+        use crate::models::industry::{Industry, YahooIndustryResponse};
+
+        let url = format!(
+            "https://query2.finance.yahoo.com/v1/finance/industries/{}",
+            industry_key
+        );
+
+        let response = self.yahoo_request(&url, None).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooIndustryResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse industry response: {}", e))
+        })?;
+
+        Industry::from_yahoo_response(yahoo_response)
+    }
+
+    /// Get market status (open/closed/pre/post)
+    ///
+    /// # Arguments
+    /// * `market` - Market identifier (e.g., "us_market", "gb_market")
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let status = client.get_market_status("us_market").await?;
+    /// println!("Market is {}", if status.is_open() { "open" } else { "closed" });
+    /// ```
+    pub async fn get_market_status(
+        &self,
+        market: &str,
+    ) -> Result<crate::models::MarketStatus, YahooError> {
+        use crate::models::market::{MarketStatus, YahooMarketTimeResponse};
+
+        let url = "https://query1.finance.yahoo.com/v6/finance/markettime";
+
+        let params = [
+            ("formatted", "true"),
+            ("key", "finance"),
+            ("lang", "en-US"),
+            ("market", market),
+        ];
+
+        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooMarketTimeResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse market time response: {}", e))
+        })?;
+
+        MarketStatus::from_yahoo_response(market.to_string(), yahoo_response)
+    }
+
+    /// Get market summary with major indices
+    ///
+    /// # Arguments
+    /// * `market` - Market identifier (e.g., "us_market")
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let summary = client.get_market_summary("us_market").await?;
+    /// for index in &summary.indices {
+    ///     println!("{}: {} ({:+.2}%)", index.short_name, index.price, index.percent_change);
+    /// }
+    /// ```
+    pub async fn get_market_summary(
+        &self,
+        market: &str,
+    ) -> Result<crate::models::MarketSummaryResponse, YahooError> {
+        use crate::models::market::{MarketSummaryResponse, YahooMarketSummaryResponse};
+
+        let url = "https://query1.finance.yahoo.com/v6/finance/quote/marketSummary";
+
+        let params = [
+            ("fields", "shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent"),
+            ("formatted", "false"),
+            ("lang", "en-US"),
+            ("market", market),
+        ];
+
+        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+
+        let yahoo_response: YahooMarketSummaryResponse = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse market summary response: {}", e))
+        })?;
+
+        // Optionally get market status
+        let status = self.get_market_status(market).await.ok();
+
+        MarketSummaryResponse::from_yahoo_response(market.to_string(), yahoo_response, status)
+    }
 }

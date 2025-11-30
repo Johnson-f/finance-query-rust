@@ -78,6 +78,8 @@ pub use models::{
     EarningsEstimate, RevenueEstimate, EarningsHistoryItem,
     RecommendationsResponse, UpgradesDowngradesResponse, PriceTargetsResponse,
     EarningsEstimateResponse, RevenueEstimateResponse, EarningsHistoryResponse,
+    EpsTrend, EpsRevisions, GrowthEstimate,
+    EpsTrendResponse, EpsRevisionsResponse, GrowthEstimatesResponse,
 };
 
 // Re-export sectors models
@@ -88,3 +90,24 @@ pub use models::{
     Quarter, EarningsCallListing, EarningsCallsList, TranscriptSpeaker,
     TranscriptParagraph, EarningsTranscript,
 };
+
+// Re-export actions models
+pub use models::{ActionsResponse, Dividend, StockSplit, CapitalGain};
+
+// Re-export options models
+pub use models::{OptionChain, OptionContract, OptionExpirations};
+
+// Re-export calendar models
+pub use models::Calendar;
+
+// Re-export SEC filings models
+pub use models::{SecFiling, SecFilingsResponse, SecExhibit};
+
+// Re-export sustainability/ESG models
+pub use models::SustainabilityScores;
+
+// Re-export industry models
+pub use models::{Industry, IndustryCompany};
+
+// Re-export market models
+pub use models::{MarketStatus, MarketSummaryItem, MarketSummaryResponse};

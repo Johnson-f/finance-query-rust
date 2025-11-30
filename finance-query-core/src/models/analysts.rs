@@ -98,6 +98,50 @@ pub struct EarningsHistoryItem {
     pub surprise_percent: Option<f64>,
 }
 
+/// EPS trend data showing how estimates have changed over time
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpsTrend {
+    pub period: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "7daysAgo")]
+    pub days_7_ago: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "30daysAgo")]
+    pub days_30_ago: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "60daysAgo")]
+    pub days_60_ago: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "90daysAgo")]
+    pub days_90_ago: Option<f64>,
+}
+
+/// EPS revisions showing analyst estimate changes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpsRevisions {
+    pub period: String,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "upLast7days")]
+    pub up_last_7_days: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "upLast30days")]
+    pub up_last_30_days: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "downLast7days")]
+    pub down_last_7_days: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "downLast30days")]
+    pub down_last_30_days: Option<i32>,
+}
+
+/// Growth estimates comparing stock to industry/sector/index
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrowthEstimate {
+    pub period: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stock: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub industry: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sector: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<f64>,
+}
+
 // Response types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecommendationsResponse {
@@ -138,6 +182,27 @@ pub struct EarningsHistoryResponse {
     pub symbol: String,
     #[serde(rename = "earningsHistory")]
     pub earnings_history: Vec<EarningsHistoryItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpsTrendResponse {
+    pub symbol: String,
+    #[serde(rename = "epsTrend")]
+    pub eps_trend: Vec<EpsTrend>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpsRevisionsResponse {
+    pub symbol: String,
+    #[serde(rename = "epsRevisions")]
+    pub eps_revisions: Vec<EpsRevisions>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrowthEstimatesResponse {
+    pub symbol: String,
+    #[serde(rename = "growthEstimates")]
+    pub growth_estimates: Vec<GrowthEstimate>,
 }
 
 #[cfg(test)]
