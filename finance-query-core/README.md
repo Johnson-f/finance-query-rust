@@ -9,6 +9,7 @@ A Rust client library for Yahoo Finance API. Fetch quotes, historical data, fina
 - Strongly-typed data models for all Yahoo Finance responses
 - Comprehensive error handling
 - WebSocket support for real-time data
+- Async streaming for continuous quote updates
 
 ## Installation
 
@@ -27,12 +28,12 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create client components
-    let fetch_client = Arc::new(FetchClient::new());
-    let auth_manager = Arc::new(YahooAuthManager::new(fetch_client.clone()));
-    let client = YahooFinanceClient::new(auth_manager, fetch_client);
+    let fetch_client = Arc::new(FetchClient::new(None)?);
+    let cookie_jar = fetch_client.cookie_jar().clone();
+    let auth_manager = Arc::new(YahooAuthManager::new(None, cookie_jar));
+    let client = YahooFinanceClient::new(auth_manager.clone(), fetch_client);
 
-    // Fetch a quote
+    auth_manager.refresh().await?;
     let quote = client.get_quote("AAPL").await?;
     println!("Price: {}", quote["regularMarketPrice"]);
 
@@ -40,280 +41,444 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Usage Examples
+## Models & JSON Formats
 
-### Fetching Stock Quotes
+### Quote Models
 
-```rust
-// Get a simple quote
-let quote = client.get_quote("AAPL").await?;
+#### SimpleQuote
+Basic quote data for streaming and lists.
 
-// Get multiple quotes
-let quotes = client.get_quotes(&["AAPL", "GOOGL", "MSFT"]).await?;
+```json
+{
+  "symbol": "AAPL",
+  "name": "Apple Inc.",
+  "price": "278.85",
+  "pre_market_price": "279.50",
+  "after_hours_price": "278.37",
+  "change": "+1.30",
+  "percent_change": "+0.47%",
+  "logo": "https://logo.clearbit.com/apple.com"
+}
 ```
 
-### Historical Data
+#### Quote
+Full quote data with all available fields.
 
-```rust
-use finance_query_core::{TimeRange, Interval};
-
-// Get historical data for the past month with daily intervals
-let history = client.get_historical("AAPL", TimeRange::OneMonth, Interval::OneDay).await?;
+```json
+{
+  "symbol": "AAPL",
+  "name": "Apple Inc.",
+  "price": "278.85",
+  "change": "+1.30",
+  "percent_change": "+0.47%",
+  "open": "277.26",
+  "high": "279.00",
+  "low": "275.99",
+  "year_high": "280.38",
+  "year_low": "169.21",
+  "volume": 16129268,
+  "avg_volume": 51432647,
+  "market_cap": "4.14T",
+  "beta": "1.11",
+  "pe": "37.33",
+  "eps": "7.47",
+  "dividend": "1.04",
+  "dividend_yield": "0.37%",
+  "ex_dividend": "2025-11-10",
+  "sector": "Technology",
+  "industry": "Consumer Electronics",
+  "about": "Apple Inc. designs, manufactures...",
+  "employees": "164000",
+  "earnings_date": "2025-01-30",
+  "five_days_return": "4.73%",
+  "one_month_return": "3.66%",
+  "ytd_return": "11.35%",
+  "year_return": "18.69%",
+  "logo": "https://logo.clearbit.com/apple.com"
+}
 ```
 
-### Financial Statements
+### Historical Models
 
-```rust
-use finance_query_core::{StatementType, Frequency};
+#### HistoricalData
+OHLCV price data for a single time period.
 
-// Get income statement
-let financials = client.get_financials("AAPL", StatementType::Income, Frequency::Annual).await?;
+```json
+{
+  "open": 277.26,
+  "high": 279.00,
+  "low": 275.99,
+  "close": 278.85,
+  "volume": 16129268,
+  "adj_close": 278.85,
+  "sma": { "20": 262.64, "50": 245.30 },
+  "ema": { "12": 270.50, "26": 258.20 }
+}
 ```
+
+#### HistoricalResponse
+```json
+{
+  "data": {
+    "2025-11-28": { "open": 277.26, "high": 279.00, "low": 275.99, "close": 278.85, "volume": 16129268 },
+    "2025-11-27": { "open": 275.50, "high": 278.00, "low": 274.80, "close": 277.55, "volume": 18234567 }
+  }
+}
+```
+
+#### TimeRange
+Options: `"1d"`, `"5d"`, `"1mo"`, `"3mo"`, `"6mo"`, `"1y"`, `"2y"`, `"5y"`, `"10y"`, `"ytd"`, `"max"`
+
+#### Interval
+Options: `"1m"`, `"3m"`, `"5m"`, `"10m"`, `"15m"`, `"20m"`, `"30m"`, `"65m"`, `"95m"`, `"1h"`, `"1d"`, `"1wk"`, `"1mo"`
 
 ### News
 
-```rust
-// Get news for a symbol
-let news = client.get_news("AAPL").await?;
+```json
+{
+  "title": "Apple Reports Record Q4 Earnings",
+  "link": "https://finance.yahoo.com/news/apple-q4-earnings",
+  "source": "Reuters",
+  "img": "https://s.yimg.com/news/apple-earnings.jpg",
+  "time": "2h ago"
+}
 ```
 
 ### Search
 
-```rust
-// Search for symbols
-let results = client.search("Apple").await?;
+#### SearchResult
+```json
+{
+  "symbol": "AAPL",
+  "name": "Apple Inc.",
+  "exchange": "NASDAQ",
+  "quote_type": "EQUITY"
+}
 ```
 
-## Available Models
-
-### Quote Models
-- `Quote` - Full quote data with all available fields
-- `SimpleQuote` - Simplified quote with essential fields
-- `DetailedQuote` - Extended quote with additional details
-
-### Historical Models
-- `HistoricalData` - OHLCV price data
-- `HistoricalResponse` - Response wrapper for historical queries
-- `TimeRange` - Time range options (1d, 5d, 1mo, 3mo, 6mo, 1y, 5y, max)
-- `Interval` - Data interval options (1m, 5m, 15m, 1h, 1d, 1wk, 1mo)
+#### SearchResponse
+```json
+{
+  "results": [
+    { "symbol": "AAPL", "name": "Apple Inc.", "exchange": "NASDAQ", "quote_type": "EQUITY" },
+    { "symbol": "AAPL.MX", "name": "Apple Inc.", "exchange": "Mexico", "quote_type": "EQUITY" }
+  ]
+}
+```
 
 ### Financial Models
-- `FinancialStatement` - Income, balance sheet, and cash flow data
-- `StatementType` - Type of financial statement
-- `Frequency` - Annual or quarterly frequency
 
-### News & Search
-- `News` - News article data
-- `SearchResult` - Individual search result
-- `SearchResponse` - Search response wrapper
+#### FinancialStatement
+```json
+{
+  "symbol": "AAPL",
+  "statement_type": "income",
+  "frequency": "annual",
+  "statement": {
+    "2024": {
+      "TotalRevenue": 383285000000,
+      "GrossProfit": 169148000000,
+      "NetIncome": 96995000000
+    },
+    "2023": {
+      "TotalRevenue": 394328000000,
+      "GrossProfit": 169148000000,
+      "NetIncome": 96995000000
+    }
+  }
+}
+```
 
-### Market Data
-- `MarketMover` - Top gainers/losers data
-- `MoverCount` - Count options for movers
-- `MarketIndex` - Index data (S&P 500, Dow Jones, etc.)
-- `MarketSector` - Sector performance data
+#### StatementType
+Options: `"income"`, `"balance"`, `"cashflow"`
 
-### Holders & Analysts
-- `InstitutionalHolder` - Institutional ownership data
-- `MutualFundHolder` - Mutual fund holdings
-- `InsiderTransaction` - Insider trading data
-- `RecommendationData` - Analyst recommendations
-- `PriceTarget` - Analyst price targets
-- `EarningsEstimate` - Earnings estimates
+#### Frequency
+Options: `"annual"`, `"quarterly"`
 
-### Earnings
-- `EarningsTranscript` - Earnings call transcript
-- `EarningsCallListing` - List of available earnings calls
+### Market Movers
 
-### WebSocket Types
-- `QuotesUpdate` - Real-time streaming quotes for single or multiple stocks
-- `ProfileUpdate` - Real-time profile updates
-- `MoversUpdate` - Real-time market movers
-- `MarketHours` - Market hours information
-- `MovingAverageUpdate` - Moving average calculations
+#### MarketMover
+```json
+{
+  "symbol": "NVDA",
+  "name": "NVIDIA Corporation",
+  "price": "145.50",
+  "change": "+8.25",
+  "percentChange": "+6.01%"
+}
+```
 
-## WebSocket Support
+#### MoverCount
+Options: `"25"`, `"50"`, `"100"`
 
-The crate provides framework-agnostic data structures for real-time WebSocket streaming. These types can be used with any WebSocket framework (tokio-tungstenite, actix-web, axum, etc.).
+### Market Indices
+
+#### MarketIndex
+```json
+{
+  "name": "S&P 500",
+  "value": 6032.38,
+  "change": "+33.64",
+  "percentChange": "+0.56%",
+  "fiveDaysReturn": "1.06%",
+  "oneMonthReturn": "5.73%",
+  "ytdReturn": "26.47%",
+  "yearReturn": "32.06%"
+}
+```
+
+#### Region
+Options: `"US"`, `"NA"`, `"SA"`, `"EU"`, `"AS"`, `"AF"`, `"ME"`, `"OCE"`, `"global"`
+
+#### Index
+Major indices: `"snp"`, `"djia"`, `"nasdaq"`, `"ftse-100"`, `"dax"`, `"nikkei-225"`, `"hang-seng"`, and 60+ more.
+
+### Sectors
+
+#### MarketSector
+```json
+{
+  "sector": "Technology",
+  "dayReturn": "+0.85%",
+  "ytdReturn": "+32.45%",
+  "yearReturn": "+45.67%",
+  "threeYearReturn": "+78.90%",
+  "fiveYearReturn": "+156.78%"
+}
+```
+
+#### MarketSectorDetails
+```json
+{
+  "sector": "Technology",
+  "dayReturn": "+0.85%",
+  "ytdReturn": "+32.45%",
+  "yearReturn": "+45.67%",
+  "threeYearReturn": "+78.90%",
+  "fiveYearReturn": "+156.78%",
+  "marketCap": "18.5T",
+  "marketWeight": "32.5%",
+  "industries": 8,
+  "companies": 450,
+  "topIndustries": ["Semiconductors", "Software", "Hardware"],
+  "topCompanies": ["AAPL", "MSFT", "NVDA"]
+}
+```
+
+### Holders
+
+#### InstitutionalHolder
+```json
+{
+  "holder": "Vanguard Group Inc",
+  "shares": 1234567890,
+  "dateReported": "2025-09-30T00:00:00Z",
+  "percentOut": 8.45,
+  "value": 344234567890
+}
+```
+
+#### MutualFundHolder
+```json
+{
+  "holder": "Vanguard Total Stock Market Index Fund",
+  "shares": 234567890,
+  "dateReported": "2025-09-30T00:00:00Z",
+  "percentOut": 1.58,
+  "value": 65234567890
+}
+```
+
+#### InsiderTransaction
+```json
+{
+  "startDate": "2025-11-15T00:00:00Z",
+  "insider": "Tim Cook",
+  "position": "CEO",
+  "transaction": "Sale",
+  "shares": 50000,
+  "value": 13942500,
+  "ownership": "D"
+}
+```
+
+#### InsiderPurchase
+```json
+{
+  "period": "Last 6 Months",
+  "purchasesShares": 125000,
+  "purchasesTransactions": 15,
+  "salesShares": 450000,
+  "salesTransactions": 25,
+  "netShares": -325000,
+  "netTransactions": -10
+}
+```
+
+### Analysts
+
+#### RecommendationData
+```json
+{
+  "period": "2025-11",
+  "strongBuy": 15,
+  "buy": 25,
+  "hold": 8,
+  "sell": 2,
+  "strongSell": 0
+}
+```
+
+#### UpgradeDowngrade
+```json
+{
+  "firm": "Morgan Stanley",
+  "toGrade": "Overweight",
+  "fromGrade": "Equal-Weight",
+  "action": "upgrade",
+  "date": "2025-11-20T00:00:00Z"
+}
+```
+
+#### PriceTarget
+```json
+{
+  "current": 278.85,
+  "mean": 245.50,
+  "median": 250.00,
+  "low": 180.00,
+  "high": 300.00
+}
+```
+
+#### EarningsHistoryItem
+```json
+{
+  "date": "2025-10-31T00:00:00Z",
+  "epsActual": 1.64,
+  "epsEstimate": 1.60,
+  "surprise": 0.04,
+  "surprisePercent": 2.5
+}
+```
+
+### Earnings Transcripts
+
+#### EarningsCallListing
+```json
+{
+  "event_id": "abc123",
+  "quarter": "Q4",
+  "year": 2024,
+  "title": "Apple Inc. Q4 2024 Earnings Call",
+  "url": "https://finance.yahoo.com/transcript/aapl-q4-2024"
+}
+```
+
+#### EarningsTranscript
+```json
+{
+  "symbol": "AAPL",
+  "quarter": "Q4",
+  "year": 2024,
+  "date": "2024-10-31T21:00:00Z",
+  "title": "Apple Inc. Q4 2024 Earnings Call",
+  "speakers": [
+    { "name": "Tim Cook", "role": "CEO", "company": "Apple Inc." },
+    { "name": "Luca Maestri", "role": "CFO", "company": "Apple Inc." }
+  ],
+  "paragraphs": [
+    { "speaker": "Tim Cook", "text": "Good afternoon and thank you for joining us..." }
+  ],
+  "metadata": {}
+}
+```
 
 ### WebSocket Types
 
 #### QuotesUpdate
-
-Stream real-time quotes for one or multiple stocks. This is the primary type for quote streaming.
-
-```rust
-use finance_query_core::{QuotesUpdate, SimpleQuote};
-use chrono::Utc;
-
-// Create a single quote update
-let quote = SimpleQuote {
-    symbol: "AAPL".to_string(),
-    name: "Apple Inc.".to_string(),
-    price: "175.50".to_string(),
-    pre_market_price: None,
-    after_hours_price: None,
-    change: "+2.50".to_string(),
-    percent_change: "+1.45%".to_string(),
-    logo: None,
-};
-let update = QuotesUpdate::single(quote);
-
-// Create a multi-quote update
-let quotes = vec![aapl_quote, googl_quote, msft_quote];
-let update = QuotesUpdate::multiple(quotes);
-
-// With custom timestamp
-let update = QuotesUpdate::with_timestamp(quotes, Utc::now());
-
-// Helper methods
-update.contains_symbol("AAPL");  // Check if symbol is in update
-update.get_quote("AAPL");        // Get specific quote
-update.len();                     // Number of quotes
-update.is_empty();               // Check if empty
-
-// Serialize for WebSocket transmission
-let json = serde_json::to_string(&update)?;
+```json
+{
+  "quotes": [
+    { "symbol": "AAPL", "name": "Apple Inc.", "price": "278.85", "change": "+1.30", "percent_change": "+0.47%" }
+  ],
+  "timestamp": "2025-11-30T12:39:37.556245Z"
+}
 ```
 
 #### ProfileUpdate
-
-Real-time updates for a stock profile including quote, similar stocks, sector performance, and news.
-
-```rust
-use finance_query_core::ProfileUpdate;
-
-// ProfileUpdate contains:
-// - quote: Option<Quote> - Current quote data
-// - similar: Option<Vec<SimpleQuote>> - Similar stocks
-// - sector_performance: Option<MarketSector> - Sector data
-// - news: Option<Vec<News>> - Recent news
-
-let update = ProfileUpdate {
-    quote: Some(quote),
-    similar: Some(vec![similar_stock]),
-    sector_performance: Some(sector),
-    news: Some(vec![news_item]),
-};
-
-// Serialize for WebSocket transmission
-let json = serde_json::to_string(&update)?;
+```json
+{
+  "quote": { "symbol": "AAPL", "name": "Apple Inc.", "price": "278.85" },
+  "similar": [{ "symbol": "MSFT", "name": "Microsoft", "price": "492.01" }],
+  "sector_performance": { "sector": "Technology", "dayReturn": "+0.85%" },
+  "news": [{ "title": "Apple News", "link": "...", "source": "Reuters" }]
+}
 ```
 
 #### MoversUpdate
-
-Real-time market movers data including most active, top gainers, and top losers.
-
-```rust
-use finance_query_core::MoversUpdate;
-
-// MoversUpdate contains:
-// - actives: Option<Vec<MarketMover>> - Most active stocks
-// - gainers: Option<Vec<MarketMover>> - Top gaining stocks
-// - losers: Option<Vec<MarketMover>> - Top losing stocks
-
-let movers = MoversUpdate {
-    actives: Some(actives_list),
-    gainers: Some(gainers_list),
-    losers: Some(losers_list),
-};
+```json
+{
+  "actives": [{ "symbol": "NVDA", "name": "NVIDIA", "price": "145.50", "percentChange": "+6.01%" }],
+  "gainers": [{ "symbol": "XYZ", "name": "XYZ Corp", "price": "50.00", "percentChange": "+15.00%" }],
+  "losers": [{ "symbol": "ABC", "name": "ABC Inc", "price": "25.00", "percentChange": "-10.00%" }]
+}
 ```
 
 #### MarketHours
-
-Market hours status updates.
-
-```rust
-use finance_query_core::MarketHours;
-use chrono::Utc;
-
-// MarketHours contains:
-// - status: String - "open", "closed", "pre-market", "after-hours"
-// - reason: Option<String> - Holiday name or other reason
-// - timestamp: DateTime<Utc> - When the status was updated
-
-let hours = MarketHours {
-    status: "open".to_string(),
-    reason: None,
-    timestamp: Utc::now(),
-};
+```json
+{
+  "status": "open",
+  "reason": null,
+  "timestamp": "2025-11-30T14:30:00Z"
+}
 ```
 
 #### MovingAverageUpdate
-
-Real-time moving average indicator updates.
-
-```rust
-use finance_query_core::MovingAverageUpdate;
-use chrono::Utc;
-
-// MovingAverageUpdate contains:
-// - symbol: String - Stock symbol
-// - indicator_type: String - "SMA" or "EMA"
-// - period: i32 - Moving average period
-// - value: f64 - Calculated value
-// - timestamp: DateTime<Utc> - Calculation time
-
-let ma_update = MovingAverageUpdate {
-    symbol: "AAPL".to_string(),
-    indicator_type: "SMA".to_string(),
-    period: 20,
-    value: 175.50,
-    timestamp: Utc::now(),
-};
+```json
+{
+  "symbol": "AAPL",
+  "indicator_type": "SMA",
+  "period": 20,
+  "value": 262.64,
+  "timestamp": "2025-11-30T14:30:00Z"
+}
 ```
 
-### WebSocket Integration Example
+## Streaming
 
-Here's an example of using these types with a WebSocket server:
+Create async streams for continuous quote updates:
 
 ```rust
-use finance_query_core::{ProfileUpdate, MoversUpdate, MarketHours};
-use serde_json;
+use finance_query_core::QuoteStream;
+use futures_util::StreamExt;
+use std::time::Duration;
 
-// Serialize updates for transmission
-fn send_profile_update(update: &ProfileUpdate) -> String {
-    serde_json::to_string(update).unwrap()
+let symbols = vec!["AAPL".to_string(), "GOOGL".to_string()];
+let mut stream = QuoteStream::new(client, symbols, Duration::from_secs(5));
+
+while let Some(Ok(update)) = stream.next().await {
+    for quote in &update.quotes {
+        println!("{}: ${}", quote.symbol, quote.price);
+    }
 }
-
-// Deserialize received messages
-fn parse_movers_update(json: &str) -> Result<MoversUpdate, serde_json::Error> {
-    serde_json::from_str(json)
-}
-
-// All WebSocket types implement:
-// - Debug, Clone for flexibility
-// - Serialize, Deserialize for JSON encoding
 ```
 
 ## Error Handling
-
-The library uses `YahooError` for all error cases:
 
 ```rust
 use finance_query_core::YahooError;
 
 match client.get_quote("INVALID").await {
     Ok(quote) => println!("Got quote"),
-    Err(YahooError::NotFound(msg)) => println!("Symbol not found: {}", msg),
+    Err(YahooError::NotFound(msg)) => println!("Not found: {}", msg),
     Err(YahooError::AuthFailed(msg)) => println!("Auth failed: {}", msg),
-    Err(YahooError::RateLimited) => println!("Rate limited, try again later"),
+    Err(YahooError::RateLimited) => println!("Rate limited"),
     Err(YahooError::HttpError(code, msg)) => println!("HTTP {}: {}", code, msg),
     Err(YahooError::ParseError(msg)) => println!("Parse error: {}", msg),
     Err(YahooError::NetworkError(e)) => println!("Network error: {}", e),
 }
 ```
-
-### Error Types
-
-| Error | Description |
-|-------|-------------|
-| `AuthFailed` | Authentication with Yahoo Finance failed |
-| `NotFound` | Requested resource (symbol, data) not found |
-| `RateLimited` | Too many requests, rate limit exceeded |
-| `HttpError` | HTTP error with status code |
-| `ParseError` | Failed to parse response data |
-| `NetworkError` | Network-level error |
 
 ## License
 

@@ -29,6 +29,7 @@
 
 pub mod client;
 pub mod models;
+pub mod streaming;
 pub mod utils;
 pub mod websocket;
 
@@ -37,6 +38,9 @@ pub use client::{FetchClient, YahooAuthManager, YahooFinanceClient, YahooError};
 
 // Re-export websocket types
 pub use websocket::{QuotesUpdate, ProfileUpdate, MoversUpdate, MarketHours, MovingAverageUpdate};
+
+// Re-export streaming types
+pub use streaming::{QuoteStream, SingleQuoteStream};
 
 // Re-export quote models
 pub use models::{Quote, SimpleQuote, DetailedQuote};
