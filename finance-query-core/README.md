@@ -447,6 +447,8 @@ Major indices: `"snp"`, `"djia"`, `"nasdaq"`, `"ftse-100"`, `"dax"`, `"nikkei-22
 
 ## Streaming
 
+### Quote Streaming
+
 Create async streams for continuous quote updates:
 
 ```rust
@@ -460,6 +462,39 @@ let mut stream = QuoteStream::new(client, symbols, Duration::from_secs(5));
 while let Some(Ok(update)) = stream.next().await {
     for quote in &update.quotes {
         println!("{}: ${}", quote.symbol, quote.price);
+    }
+}
+```
+
+### Index Streaming
+
+Stream real-time market index data:
+
+```rust
+use finance_query_core::IndexStream;
+use futures_util::StreamExt;
+use std::time::Duration;
+
+// Stream major US indices (S&P 500, Dow Jones, NASDAQ)
+let mut stream = IndexStream::us_major_indices(client.clone(), Duration::from_secs(5));
+
+while let Some(Ok(indices)) = stream.next().await {
+    for index in indices {
+        println!("{}: {:.2} ({:+})", index.name, index.value, index.percent_change);
+    }
+}
+```
+
+Or stream custom indices:
+
+```rust
+// Stream any indices by symbol
+let symbols = vec!["^GSPC".to_string(), "^FTSE".to_string(), "^N225".to_string()];
+let mut stream = IndexStream::new(client, symbols, Duration::from_secs(5));
+
+while let Some(Ok(indices)) = stream.next().await {
+    for index in indices {
+        println!("{}: {:.2}", index.name, index.value);
     }
 }
 ```

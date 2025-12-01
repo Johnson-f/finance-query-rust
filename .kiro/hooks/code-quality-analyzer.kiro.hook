@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Code Quality Analyzer",
+  "description": "Monitors source code files for changes and provides automated code quality analysis including code smells, design patterns, best practices, readability, maintainability, and performance optimizations",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.rs",
+      "finance-query-core/src/**/*.rs"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the modified code in the changed file for potential improvements. Focus on:\n\n1. **Code Smells**: Identify any code smells such as duplicated code, long methods, large classes, or complex conditionals\n2. **Design Patterns**: Suggest appropriate design patterns that could improve the code structure\n3. **Best Practices**: Check for Rust best practices including proper error handling, idiomatic Rust patterns, and proper use of ownership/borrowing\n4. **Readability**: Evaluate code clarity, naming conventions, and documentation\n5. **Maintainability**: Assess modularity, coupling, cohesion, and testability\n6. **Performance**: Identify potential performance optimizations such as unnecessary allocations, inefficient algorithms, or missing optimizations\n\nProvide specific, actionable suggestions while maintaining the existing functionality. Be concise and prioritize the most impactful improvements."
+  }
+}
