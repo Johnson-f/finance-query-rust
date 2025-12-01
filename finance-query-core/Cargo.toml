@@ -1,12 +1,12 @@
 [package]
 name = "finance-query-core"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "A Rust client library for Yahoo Finance API - fetch quotes, historical data, financials, streaming, and more"
 license = "Apache-2.0"
 repository = "https://github.com/johnson-f/finance-query-rust"
 keywords = ["yahoo", "finance", "stocks", "api", "trading"]
-categories = ["api-bindings", "finance"]
+categories = ["api-bindings", "finance", "stocks", "trading"]
 readme = "README.md"
 
 [dependencies]
