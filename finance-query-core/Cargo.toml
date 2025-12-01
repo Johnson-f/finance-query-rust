@@ -6,7 +6,7 @@ description = "A Rust client library for Yahoo Finance API - fetch quotes, histo
 license = "Apache-2.0"
 repository = "https://github.com/johnson-f/finance-query-rust"
 keywords = ["yahoo", "finance", "stocks", "api", "trading"]
-categories = ["api-bindings", "finance", "stocks", "trading"]
+categories = ["api-bindings", "finance"]
 readme = "README.md"
 
 [dependencies]
