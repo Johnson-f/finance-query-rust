@@ -38,6 +38,11 @@ impl QuotesUpdate {
         }
     }
 
+    /// Create a new QuotesUpdate with multiple quotes (alias for multiple).
+    pub fn new(quotes: Vec<SimpleQuote>) -> Self {
+        Self::multiple(quotes)
+    }
+
     /// Create a new QuotesUpdate with a specific timestamp.
     pub fn with_timestamp(quotes: Vec<SimpleQuote>, timestamp: DateTime<Utc>) -> Self {
         Self { quotes, timestamp }
@@ -81,11 +86,44 @@ pub struct ProfileUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoversUpdate {
     /// Most active stocks
-    pub actives: Option<Vec<MarketMover>>,
+    pub actives: Vec<MarketMover>,
     /// Top gaining stocks
-    pub gainers: Option<Vec<MarketMover>>,
+    pub gainers: Vec<MarketMover>,
     /// Top losing stocks
-    pub losers: Option<Vec<MarketMover>>,
+    pub losers: Vec<MarketMover>,
+    /// Timestamp of the update
+    pub timestamp: DateTime<Utc>,
+}
+
+impl MoversUpdate {
+    /// Create a new MoversUpdate with current timestamp.
+    pub fn new(
+        actives: Vec<MarketMover>,
+        gainers: Vec<MarketMover>,
+        losers: Vec<MarketMover>,
+    ) -> Self {
+        Self {
+            actives,
+            gainers,
+            losers,
+            timestamp: Utc::now(),
+        }
+    }
+
+    /// Create a new MoversUpdate with a specific timestamp.
+    pub fn with_timestamp(
+        actives: Vec<MarketMover>,
+        gainers: Vec<MarketMover>,
+        losers: Vec<MarketMover>,
+        timestamp: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            actives,
+            gainers,
+            losers,
+            timestamp,
+        }
+    }
 }
 
 /// Market hours status update.

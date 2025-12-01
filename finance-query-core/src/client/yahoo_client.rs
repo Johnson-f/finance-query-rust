@@ -720,4 +720,118 @@ impl YahooFinanceClient {
 
         MarketSummaryResponse::from_yahoo_response(market.to_string(), yahoo_response, status)
     }
+
+    /// Get market movers (most active, gainers, losers)
+    ///
+    /// # Arguments
+    /// * `count` - Number of movers to return (25, 50, or 100)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// use finance_query_core::MoverCount;
+    /// 
+    /// let (actives, gainers, losers) = client.get_movers(MoverCount::Fifty).await?;
+    /// println!("Top gainer: {} ({:+})", gainers[0].name, gainers[0].percent_change);
+    /// ```
+    pub async fn get_movers(
+        &self,
+        count: crate::models::MoverCount,
+    ) -> Result<(Vec<crate::models::MarketMover>, Vec<crate::models::MarketMover>, Vec<crate::models::MarketMover>), YahooError> {
+        let count_str = count.as_str();
+        
+        // Fetch screener data for each category
+        let actives_url = format!(
+            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count={}&scrIds=most_actives",
+            count_str
+        );
+        let gainers_url = format!(
+            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count={}&scrIds=day_gainers",
+            count_str
+        );
+        let losers_url = format!(
+            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count={}&scrIds=day_losers",
+            count_str
+        );
+
+        // Fetch all three concurrently
+        let (actives_response, gainers_response, losers_response) = tokio::join!(
+            self.yahoo_request(&actives_url, None),
+            self.yahoo_request(&gainers_url, None),
+            self.yahoo_request(&losers_url, None)
+        );
+
+        let actives = Self::parse_movers_response(actives_response?).await?;
+        let gainers = Self::parse_movers_response(gainers_response?).await?;
+        let losers = Self::parse_movers_response(losers_response?).await?;
+
+        Ok((actives, gainers, losers))
+    }
+
+    async fn parse_movers_response(
+        response: reqwest::Response,
+    ) -> Result<Vec<crate::models::MarketMover>, YahooError> {
+        let text = response.text().await.map_err(YahooError::NetworkError)?;
+        let data: Value = serde_json::from_str(&text).map_err(|e| {
+            YahooError::ParseError(format!("Failed to parse movers response: {}", e))
+        })?;
+
+        let mut movers = Vec::new();
+
+        if let Some(quotes) = data
+            .get("finance")
+            .and_then(|f| f.get("result"))
+            .and_then(|r| r.get(0))
+            .and_then(|r| r.get("quotes"))
+            .and_then(|q| q.as_array())
+        {
+            for quote in quotes {
+                let symbol = quote
+                    .get("symbol")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                // Filter for US stocks only (no dots or with US exchange suffixes)
+                if !symbol.is_empty() && !symbol.contains('.') 
+                    || symbol.ends_with(".OB") 
+                    || symbol.ends_with(".PK") 
+                {
+                    let name = quote
+                        .get("longName")
+                        .or_else(|| quote.get("shortName"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let price = quote
+                        .get("regularMarketPrice")
+                        .and_then(|p| p.as_f64())
+                        .map(|p| format!("{:.2}", p))
+                        .unwrap_or_else(|| "0.00".to_string());
+
+                    let change = quote
+                        .get("regularMarketChange")
+                        .and_then(|c| c.as_f64())
+                        .map(|c| format!("{:+.2}", c))
+                        .unwrap_or_else(|| "0.00".to_string());
+
+                    let percent_change = quote
+                        .get("regularMarketChangePercent")
+                        .and_then(|p| p.as_f64())
+                        .map(|p| format!("{:+.2}%", p))
+                        .unwrap_or_else(|| "0.00%".to_string());
+
+                    movers.push(crate::models::MarketMover {
+                        symbol,
+                        name,
+                        price,
+                        change,
+                        percent_change,
+                    });
+                }
+            }
+        }
+
+        Ok(movers)
+    }
 }

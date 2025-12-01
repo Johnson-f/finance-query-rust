@@ -499,6 +499,50 @@ while let Some(Ok(indices)) = stream.next().await {
 }
 ```
 
+### Movers Streaming
+
+Stream real-time market movers (most active, top gainers, top losers):
+
+```rust
+use finance_query_core::{MoversStream, MoverCount};
+use futures_util::StreamExt;
+use std::time::Duration;
+
+// Stream top 50 movers in each category
+let mut stream = MoversStream::new(client, MoverCount::Fifty, Duration::from_secs(5));
+
+while let Some(Ok(update)) = stream.next().await {
+    println!("\n📈 Top 5 Gainers:");
+    for (i, mover) in update.gainers.iter().take(5).enumerate() {
+        println!("  {}. {} ({}): {} {}", 
+            i + 1, mover.symbol, mover.name, mover.price, mover.percent_change);
+    }
+    
+    println!("\n📉 Top 5 Losers:");
+    for (i, mover) in update.losers.iter().take(5).enumerate() {
+        println!("  {}. {} ({}): {} {}", 
+            i + 1, mover.symbol, mover.name, mover.price, mover.percent_change);
+    }
+    
+    println!("\n🔥 Top 5 Most Active:");
+    for (i, mover) in update.actives.iter().take(5).enumerate() {
+        println!("  {}. {} ({}): {} {}", 
+            i + 1, mover.symbol, mover.name, mover.price, mover.percent_change);
+    }
+}
+```
+
+Or use defaults (50 movers, 5-second interval):
+
+```rust
+let mut stream = MoversStream::with_defaults(client);
+
+while let Some(Ok(update)) = stream.next().await {
+    println!("Actives: {}, Gainers: {}, Losers: {}", 
+        update.actives.len(), update.gainers.len(), update.losers.len());
+}
+```
+
 ## Error Handling
 
 ```rust
@@ -596,6 +640,33 @@ let summary = client.get_market_summary("us_market").await?;
 for index in &summary.indices {
     println!("{}: {:.2} ({:+.2}%)", index.short_name, index.price, index.percent_change);
 }
+```
+
+### Market Movers
+
+```rust
+use finance_query_core::MoverCount;
+
+// Get top 50 movers in each category
+let (actives, gainers, losers) = client.get_movers(MoverCount::Fifty).await?;
+
+// Display top gainers
+println!("Top Gainers:");
+for mover in gainers.iter().take(10) {
+    println!("  {} ({}): {} {}", 
+        mover.symbol, mover.name, mover.price, mover.percent_change);
+}
+
+// Find extreme movers (>10% change)
+let big_movers: Vec<_> = gainers.iter()
+    .filter(|m| {
+        m.percent_change
+            .trim_start_matches('+')
+            .trim_end_matches('%')
+            .parse::<f64>()
+            .unwrap_or(0.0) > 10.0
+    })
+    .collect();
 ```
 
 ## License

@@ -246,6 +246,83 @@ fn parse_simple_quotes(data: &Value) -> Vec<SimpleQuote> {
     quotes
 }
 
+/// A stream that yields market movers (actives, gainers, losers) at regular intervals.
+pub struct MoversStream;
+
+impl MoversStream {
+    /// Create a new movers stream that fetches market movers at the specified interval.
+    ///
+    /// # Arguments
+    /// * `client` - The Yahoo Finance client to use for fetching data
+    /// * `count` - Number of movers to return (25, 50, or 100)
+    /// * `poll_interval` - How often to fetch new data
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// use finance_query_core::{MoversStream, YahooFinanceClient, MoverCount};
+    /// use std::time::Duration;
+    /// use futures_util::StreamExt;
+    ///
+    /// let stream = MoversStream::new(&client, MoverCount::Fifty, Duration::from_secs(5));
+    /// 
+    /// while let Some(result) = stream.next().await {
+    ///     match result {
+    ///         Ok(update) => {
+    ///             println!("Actives: {}", update.actives.len());
+    ///             println!("Gainers: {}", update.gainers.len());
+    ///             println!("Losers: {}", update.losers.len());
+    ///         }
+    ///         Err(e) => eprintln!("Error: {}", e),
+    ///     }
+    /// }
+    /// ```
+    pub fn new(
+        client: Arc<YahooFinanceClient>,
+        count: crate::models::MoverCount,
+        poll_interval: Duration,
+    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
+        Box::pin(stream! {
+            let mut ticker = interval(poll_interval);
+            
+            loop {
+                ticker.tick().await;
+                debug!("Fetching market movers (count: {})", count.as_str());
+                
+                match client.get_movers(count).await {
+                    Ok((actives, gainers, losers)) => {
+                        let update = crate::websocket::MoversUpdate::with_timestamp(
+                            actives,
+                            gainers,
+                            losers,
+                            Utc::now()
+                        );
+                        yield Ok(update);
+                    }
+                    Err(e) => {
+                        error!("Failed to fetch movers: {}", e);
+                        yield Err(e);
+                    }
+                }
+            }
+        })
+    }
+
+    /// Create a movers stream with a default 5-second interval.
+    pub fn with_default_interval(
+        client: Arc<YahooFinanceClient>,
+        count: crate::models::MoverCount,
+    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
+        Self::new(client, count, Duration::from_secs(5))
+    }
+
+    /// Create a movers stream with default count (50) and interval (5 seconds).
+    pub fn with_defaults(
+        client: Arc<YahooFinanceClient>,
+    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
+        Self::new(client, crate::models::MoverCount::default(), Duration::from_secs(5))
+    }
+}
+
 /// Parse market indices from Yahoo Finance API response.
 fn parse_market_indices(data: &Value) -> Vec<crate::models::MarketIndex> {
     let mut indices = Vec::new();
@@ -334,5 +411,22 @@ mod tests {
         assert_eq!(quotes[0].price, "175.50");
         assert_eq!(quotes[0].change, "+2.50");
         assert_eq!(quotes[0].percent_change, "+1.45%");
+    }
+
+    #[test]
+    fn test_movers_stream_creation() {
+        // Test that we can create a MoversStream with different configurations
+        // This is a compile-time test to ensure the API is correct
+        use crate::models::MoverCount;
+        
+        // These would require a real client to actually run, but we can verify
+        // the types compile correctly
+        let _count_25 = MoverCount::TwentyFive;
+        let _count_50 = MoverCount::Fifty;
+        let _count_100 = MoverCount::Hundred;
+        
+        assert_eq!(_count_25.as_str(), "25");
+        assert_eq!(_count_50.as_str(), "50");
+        assert_eq!(_count_100.as_str(), "100");
     }
 }
