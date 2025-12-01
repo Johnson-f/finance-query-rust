@@ -47,7 +47,7 @@ impl FetchClient {
         // Only use proxy for general client if PROXY_URL is set (not AUTH_PROXY_URL)
         if let Some(proxy_url) = &proxy {
             builder = builder.proxy(
-                reqwest::Proxy::all(proxy_url).map_err(|e| YahooError::NetworkError(e))?,
+                reqwest::Proxy::all(proxy_url).map_err(YahooError::NetworkError)?,
             );
         }
 

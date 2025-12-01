@@ -138,7 +138,7 @@ impl Query {
         if let Some(indicators_str) = indicators {
             let requested_indicators: HashSet<IndicatorTypeModel> = indicators_str
                 .iter()
-                .filter_map(|s| IndicatorTypeModel::from_str(s))
+                .filter_map(|s| IndicatorTypeModel::parse(s))
                 .collect();
             
             if requested_indicators.is_empty() {

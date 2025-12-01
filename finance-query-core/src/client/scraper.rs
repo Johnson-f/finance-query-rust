@@ -126,10 +126,7 @@ fn extract_from_json_ld(document: &Html, field: &str) -> Option<f64> {
 fn parse_numeric_value(text: &str) -> Option<f64> {
     let cleaned = text
         .trim()
-        .replace(',', "")
-        .replace('$', "")
-        .replace('%', "")
-        .replace('+', "")
+        .replace([',', '$', '%', '+'], "")
         .trim()
         .to_string();
 

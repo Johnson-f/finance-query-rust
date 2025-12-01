@@ -32,7 +32,7 @@ impl HolderType {
     }
 
     #[allow(dead_code)]
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "major" => Some(HolderType::Major),
             "institutional" => Some(HolderType::Institutional),

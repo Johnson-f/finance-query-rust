@@ -21,7 +21,7 @@ impl MoverCount {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "25" => Some(MoverCount::TwentyFive),
             "50" => Some(MoverCount::Fifty),

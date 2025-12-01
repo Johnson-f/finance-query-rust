@@ -84,7 +84,7 @@ impl ActionsResponse {
             if let Some(events) = &result.events {
                 // Parse dividends
                 if let Some(divs) = &events.dividends {
-                    for (_, div) in divs {
+                    for div in divs.values() {
                         actions.dividends.push(Dividend {
                             date: Utc
                                 .timestamp_opt(div.date, 0)
@@ -102,7 +102,7 @@ impl ActionsResponse {
 
                 // Parse splits
                 if let Some(splits) = &events.splits {
-                    for (_, split) in splits {
+                    for split in splits.values() {
                         actions.splits.push(StockSplit::new(
                             Utc.timestamp_opt(split.date, 0)
                                 .single()
@@ -119,7 +119,7 @@ impl ActionsResponse {
 
                 // Parse capital gains
                 if let Some(gains) = &events.capital_gains {
-                    for (_, gain) in gains {
+                    for gain in gains.values() {
                         actions.capital_gains.push(CapitalGain {
                             date: Utc
                                 .timestamp_opt(gain.date, 0)

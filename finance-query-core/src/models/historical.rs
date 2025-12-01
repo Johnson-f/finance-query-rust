@@ -9,7 +9,7 @@ pub enum IndicatorType {
 }
 
 impl IndicatorType {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "sma" => Some(IndicatorType::SMA),
             "ema" => Some(IndicatorType::EMA),
@@ -20,7 +20,7 @@ impl IndicatorType {
     pub fn parse_list(s: &str) -> HashSet<Self> {
         s.split(',')
             .map(|s| s.trim())
-            .filter_map(IndicatorType::from_str)
+            .filter_map(IndicatorType::parse)
             .collect()
     }
 }

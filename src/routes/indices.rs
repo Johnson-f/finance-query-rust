@@ -13,7 +13,7 @@ pub struct IndicesQuery {
 }
 
 fn parse_index(s: &str) -> Option<Index> {
-    Index::from_str(s)
+    Index::parse(s)
 }
 
 fn parse_region(s: &str) -> Option<Region> {

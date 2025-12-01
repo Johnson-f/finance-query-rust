@@ -36,7 +36,7 @@ impl QuoteStream {
     /// use std::time::Duration;
     /// use futures_util::StreamExt;
     ///
-    /// let stream = QuoteStream::new(&client, vec!["AAPL", "GOOGL"], Duration::from_secs(5));
+    /// let stream = QuoteStream::create(&client, vec!["AAPL", "GOOGL"], Duration::from_secs(5));
     /// 
     /// while let Some(result) = stream.next().await {
     ///     match result {
@@ -45,7 +45,7 @@ impl QuoteStream {
     ///     }
     /// }
     /// ```
-    pub fn new(
+    pub fn create(
         client: Arc<YahooFinanceClient>,
         symbols: Vec<String>,
         poll_interval: Duration,
@@ -79,7 +79,7 @@ impl QuoteStream {
         client: Arc<YahooFinanceClient>,
         symbols: Vec<String>,
     ) -> Pin<Box<dyn Stream<Item = Result<QuotesUpdate, YahooError>> + Send>> {
-        Self::new(client, symbols, Duration::from_secs(5))
+        Self::create(client, symbols, Duration::from_secs(5))
     }
 }
 
@@ -88,7 +88,7 @@ pub struct SingleQuoteStream;
 
 impl SingleQuoteStream {
     /// Create a stream for a single symbol.
-    pub fn new(
+    pub fn create(
         client: Arc<YahooFinanceClient>,
         symbol: String,
         poll_interval: Duration,
@@ -136,7 +136,7 @@ impl IndexStream {
     ///
     /// // Stream S&P 500, Dow Jones, and NASDAQ
     /// let symbols = vec!["^GSPC".to_string(), "^DJI".to_string(), "^IXIC".to_string()];
-    /// let stream = IndexStream::new(&client, symbols, Duration::from_secs(5));
+    /// let stream = IndexStream::create(&client, symbols, Duration::from_secs(5));
     /// 
     /// while let Some(result) = stream.next().await {
     ///     match result {
@@ -149,7 +149,7 @@ impl IndexStream {
     ///     }
     /// }
     /// ```
-    pub fn new(
+    pub fn create(
         client: Arc<YahooFinanceClient>,
         index_symbols: Vec<String>,
         poll_interval: Duration,
@@ -182,7 +182,7 @@ impl IndexStream {
         client: Arc<YahooFinanceClient>,
         index_symbols: Vec<String>,
     ) -> Pin<Box<dyn Stream<Item = Result<Vec<crate::models::MarketIndex>, YahooError>> + Send>> {
-        Self::new(client, index_symbols, Duration::from_secs(5))
+        Self::create(client, index_symbols, Duration::from_secs(5))
     }
 
     /// Create a stream for major US indices (S&P 500, Dow Jones, NASDAQ).
@@ -195,55 +195,65 @@ impl IndexStream {
             "^DJI".to_string(),   // Dow Jones
             "^IXIC".to_string(),  // NASDAQ
         ];
-        Self::new(client, symbols, poll_interval)
+        Self::create(client, symbols, poll_interval)
     }
+}
+
+/// Helper to extract quote results array from Yahoo Finance API response.
+fn get_quote_results(data: &Value) -> Option<&Vec<Value>> {
+    data.get("quoteResponse")
+        .and_then(|qr| qr.get("result"))
+        .and_then(|r| r.as_array())
+}
+
+/// Helper to extract string field from JSON, with fallback.
+fn get_string_field(result: &Value, field: &str, fallback: &str) -> String {
+    result.get(field)
+        .and_then(|s| s.as_str())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+/// Helper to extract name field (tries longName, then shortName).
+fn get_name_field(result: &Value) -> String {
+    result.get("longName")
+        .or_else(|| result.get("shortName"))
+        .and_then(|n| n.as_str())
+        .unwrap_or("")
+        .to_string()
 }
 
 /// Parse simple quotes from Yahoo Finance API response.
 fn parse_simple_quotes(data: &Value) -> Vec<SimpleQuote> {
-    let mut quotes = Vec::new();
+    let Some(results) = get_quote_results(data) else {
+        return Vec::new();
+    };
     
-    if let Some(results) = data
-        .get("quoteResponse")
-        .and_then(|qr| qr.get("result"))
-        .and_then(|r| r.as_array())
-    {
-        for result in results {
-            let quote = SimpleQuote {
-                symbol: result.get("symbol")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                name: result.get("longName")
-                    .or_else(|| result.get("shortName"))
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                price: result.get("regularMarketPrice")
-                    .and_then(|p| p.as_f64())
-                    .map(|p| format!("{:.2}", p))
-                    .unwrap_or_else(|| "0.00".to_string()),
-                pre_market_price: result.get("preMarketPrice")
-                    .and_then(|p| p.as_f64())
-                    .map(|p| format!("{:.2}", p)),
-                after_hours_price: result.get("postMarketPrice")
-                    .and_then(|p| p.as_f64())
-                    .map(|p| format!("{:.2}", p)),
-                change: result.get("regularMarketChange")
-                    .and_then(|c| c.as_f64())
-                    .map(|c| format!("{:+.2}", c))
-                    .unwrap_or_else(|| "0.00".to_string()),
-                percent_change: result.get("regularMarketChangePercent")
-                    .and_then(|p| p.as_f64())
-                    .map(|p| format!("{:+.2}%", p))
-                    .unwrap_or_else(|| "0.00%".to_string()),
-                logo: None,
-            };
-            quotes.push(quote);
+    results.iter().map(|result| {
+        SimpleQuote {
+            symbol: get_string_field(result, "symbol", ""),
+            name: get_name_field(result),
+            price: result.get("regularMarketPrice")
+                .and_then(|p| p.as_f64())
+                .map(|p| format!("{:.2}", p))
+                .unwrap_or_else(|| "0.00".to_string()),
+            pre_market_price: result.get("preMarketPrice")
+                .and_then(|p| p.as_f64())
+                .map(|p| format!("{:.2}", p)),
+            after_hours_price: result.get("postMarketPrice")
+                .and_then(|p| p.as_f64())
+                .map(|p| format!("{:.2}", p)),
+            change: result.get("regularMarketChange")
+                .and_then(|c| c.as_f64())
+                .map(|c| format!("{:+.2}", c))
+                .unwrap_or_else(|| "0.00".to_string()),
+            percent_change: result.get("regularMarketChangePercent")
+                .and_then(|p| p.as_f64())
+                .map(|p| format!("{:+.2}%", p))
+                .unwrap_or_else(|| "0.00%".to_string()),
+            logo: None,
         }
-    }
-    
-    quotes
+    }).collect()
 }
 
 /// A stream that yields market movers (actives, gainers, losers) at regular intervals.
@@ -263,7 +273,7 @@ impl MoversStream {
     /// use std::time::Duration;
     /// use futures_util::StreamExt;
     ///
-    /// let stream = MoversStream::new(&client, MoverCount::Fifty, Duration::from_secs(5));
+    /// let stream = MoversStream::create(&client, MoverCount::Fifty, Duration::from_secs(5));
     /// 
     /// while let Some(result) = stream.next().await {
     ///     match result {
@@ -276,7 +286,7 @@ impl MoversStream {
     ///     }
     /// }
     /// ```
-    pub fn new(
+    pub fn create(
         client: Arc<YahooFinanceClient>,
         count: crate::models::MoverCount,
         poll_interval: Duration,
@@ -312,76 +322,57 @@ impl MoversStream {
         client: Arc<YahooFinanceClient>,
         count: crate::models::MoverCount,
     ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
-        Self::new(client, count, Duration::from_secs(5))
+        Self::create(client, count, Duration::from_secs(5))
     }
 
     /// Create a movers stream with default count (50) and interval (5 seconds).
     pub fn with_defaults(
         client: Arc<YahooFinanceClient>,
     ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
-        Self::new(client, crate::models::MoverCount::default(), Duration::from_secs(5))
+        Self::create(client, crate::models::MoverCount::default(), Duration::from_secs(5))
     }
 }
 
 /// Parse market indices from Yahoo Finance API response.
 fn parse_market_indices(data: &Value) -> Vec<crate::models::MarketIndex> {
-    let mut indices = Vec::new();
+    let Some(results) = get_quote_results(data) else {
+        return Vec::new();
+    };
     
-    if let Some(results) = data
-        .get("quoteResponse")
-        .and_then(|qr| qr.get("result"))
-        .and_then(|r| r.as_array())
-    {
-        for result in results {
-            let name = result.get("longName")
-                .or_else(|| result.get("shortName"))
-                .and_then(|n| n.as_str())
-                .unwrap_or("")
-                .to_string();
-            
-            let value = result.get("regularMarketPrice")
-                .and_then(|p| p.as_f64())
-                .unwrap_or(0.0);
-            
-            let change = result.get("regularMarketChange")
-                .and_then(|c| c.as_f64())
-                .map(|c| format!("{:+.2}", c))
-                .unwrap_or_else(|| "0.00".to_string());
-            
-            let percent_change = result.get("regularMarketChangePercent")
-                .and_then(|p| p.as_f64())
-                .map(|p| format!("{:+.2}%", p))
-                .unwrap_or_else(|| "0.00%".to_string());
-            
-            // Parse performance returns if available
-            let five_days_return = result.get("fiftyTwoWeekLow")
-                .and_then(|_| None); // Placeholder - would need actual field
-            
-            let one_month_return = result.get("fiftyTwoWeekHigh")
-                .and_then(|_| None); // Placeholder - would need actual field
-            
-            let index = crate::models::MarketIndex {
-                name,
-                value,
-                change,
-                percent_change,
-                five_days_return,
-                one_month_return,
-                three_month_return: None,
-                six_month_return: None,
-                ytd_return: None,
-                year_return: None,
-                three_year_return: None,
-                five_year_return: None,
-                ten_year_return: None,
-                max_return: None,
-            };
-            
-            indices.push(index);
+    results.iter().map(|result| {
+        let value = result.get("regularMarketPrice")
+            .and_then(|p| p.as_f64())
+            .unwrap_or(0.0);
+        
+        let change = result.get("regularMarketChange")
+            .and_then(|c| c.as_f64())
+            .map(|c| format!("{:+.2}", c))
+            .unwrap_or_else(|| "0.00".to_string());
+        
+        let percent_change = result.get("regularMarketChangePercent")
+            .and_then(|p| p.as_f64())
+            .map(|p| format!("{:+.2}%", p))
+            .unwrap_or_else(|| "0.00%".to_string());
+        
+        // TODO: Yahoo Finance API doesn't provide historical return data in quote responses.
+        // These would need to be calculated from historical price data or fetched separately.
+        crate::models::MarketIndex {
+            name: get_name_field(result),
+            value,
+            change,
+            percent_change,
+            five_days_return: None,
+            one_month_return: None,
+            three_month_return: None,
+            six_month_return: None,
+            ytd_return: None,
+            year_return: None,
+            three_year_return: None,
+            five_year_return: None,
+            ten_year_return: None,
+            max_return: None,
         }
-    }
-    
-    indices
+    }).collect()
 }
 
 #[cfg(test)]

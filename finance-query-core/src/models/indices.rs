@@ -274,7 +274,7 @@ impl Index {
     }
 
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "snp" => Some(Index::Gspc),
             "djia" => Some(Index::Dji),

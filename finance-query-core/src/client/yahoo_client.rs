@@ -242,7 +242,7 @@ impl YahooFinanceClient {
             symbol
         );
         let params = [("interval", interval), ("range", range)];
-        self.json(&url, Some(&params)).await
+        self.json(url.as_str(), Some(&params)).await
     }
 
     /// Get chart data using period1 and period2 (Unix timestamps) instead of range.
@@ -262,7 +262,7 @@ impl YahooFinanceClient {
             ("period1", &period1.to_string()),
             ("period2", &period2.to_string()),
         ];
-        self.json(&url, Some(&params)).await
+        self.json(url.as_str(), Some(&params)).await
     }
 
     /// Search for symbols.
@@ -671,7 +671,7 @@ impl YahooFinanceClient {
             ("market", market),
         ];
 
-        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let response = self.yahoo_request(url, Some(&params)).await?;
         let text = response.text().await.map_err(YahooError::NetworkError)?;
 
         let yahoo_response: YahooMarketTimeResponse = serde_json::from_str(&text).map_err(|e| {
@@ -708,7 +708,7 @@ impl YahooFinanceClient {
             ("market", market),
         ];
 
-        let response = self.yahoo_request(&url, Some(&params)).await?;
+        let response = self.yahoo_request(url, Some(&params)).await?;
         let text = response.text().await.map_err(YahooError::NetworkError)?;
 
         let yahoo_response: YahooMarketSummaryResponse = serde_json::from_str(&text).map_err(|e| {
