@@ -1,9 +1,23 @@
+mod analysts;
+mod calendar;
 mod financial;
 mod historical;
+mod holder;
+mod news;
 mod quotes;
 
+use analysts::{
+    get_all_analyst_data, get_earnings_history, get_price_targets, get_recommendations,
+    get_upgrades_downgrades,
+};
+use calendar::{get_dividend_calendar, get_earnings_calendar, get_full_calendar};
 use financial::{get_balance_sheet, get_cash_flow, get_income_statement, Frequency};
 use historical::{get_chart, get_historical_data, get_historical_data_by_date, ChartResponse};
+use holder::{
+    get_all_holders, get_institutional_holders, get_insider_roster, get_insider_transactions,
+    get_major_holders, get_mutual_fund_holders,
+};
+use news::{get_market_news, get_news_for_symbol, search_news};
 use quotes::{
     get_detailed_quote, get_logo_url, get_similar_quotes, get_simple_quotes,
     DetailedQuoteResponse, SimpleQuotesResponse, SimilarQuotesResponse,
@@ -339,6 +353,367 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         format_large_number(point.value as i64)
                     );
                 }
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    // ========================================================================
+    // Holder Data Tests
+    // ========================================================================
+
+    println!("🏛️ Fetching major holders breakdown for AAPL...");
+    match get_major_holders("AAPL").await {
+        Ok(breakdown) => {
+            if let Some(insiders) = breakdown.insiders_percent_held {
+                println!("Insiders: {:.2}%", insiders * 100.0);
+            }
+            if let Some(institutions) = breakdown.institutions_percent_held {
+                println!("Institutions: {:.2}%", institutions * 100.0);
+            }
+            if let Some(float_held) = breakdown.institutions_float_percent_held {
+                println!("Float held by institutions: {:.2}%", float_held * 100.0);
+            }
+            if let Some(count) = breakdown.institutions_count {
+                println!("Number of institutions: {}", count);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("🏦 Fetching top institutional holders for AAPL...");
+    match get_institutional_holders("AAPL").await {
+        Ok(holders) => {
+            println!("Top 5 institutional holders:");
+            for holder in holders.iter().take(5) {
+                println!(
+                    "  {} - {} shares (${}) - {:.2}%",
+                    holder.organization,
+                    format_large_number(holder.shares),
+                    holder.value.map(|v| format_large_number(v)).unwrap_or("N/A".to_string()),
+                    holder.percent_held.unwrap_or(0.0) * 100.0
+                );
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📊 Fetching top mutual fund holders for AAPL...");
+    match get_mutual_fund_holders("AAPL").await {
+        Ok(holders) => {
+            println!("Top 5 mutual fund holders:");
+            for holder in holders.iter().take(5) {
+                println!(
+                    "  {} - {} shares",
+                    holder.organization,
+                    format_large_number(holder.shares)
+                );
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("👤 Fetching insider transactions for AAPL...");
+    match get_insider_transactions("AAPL").await {
+        Ok(transactions) => {
+            println!("Recent insider transactions:");
+            for txn in transactions.iter().take(5) {
+                println!(
+                    "  {} ({}) - {} - {} shares",
+                    txn.filer_name,
+                    txn.filer_relation.as_deref().unwrap_or("N/A"),
+                    txn.transaction_text.as_deref().unwrap_or("N/A"),
+                    txn.shares.map(|s| format_large_number(s)).unwrap_or("N/A".to_string())
+                );
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📋 Fetching insider roster for AAPL...");
+    match get_insider_roster("AAPL").await {
+        Ok(roster) => {
+            println!("Company insiders:");
+            for insider in roster.iter().take(5) {
+                println!(
+                    "  {} ({}) - {} shares",
+                    insider.name,
+                    insider.relation.as_deref().unwrap_or("N/A"),
+                    format_large_number(insider.total_shares())
+                );
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📦 Fetching all holder data for AAPL...");
+    match get_all_holders("AAPL").await {
+        Ok(data) => {
+            println!("Symbol: {}", data.symbol);
+            println!("Major holders: {}", if data.major_holders.is_some() { "✓" } else { "✗" });
+            println!("Institutional holders: {}", data.institutional_holders.as_ref().map(|h| h.len()).unwrap_or(0));
+            println!("Mutual fund holders: {}", data.mutual_fund_holders.as_ref().map(|h| h.len()).unwrap_or(0));
+            println!("Insider transactions: {}", data.insider_transactions.as_ref().map(|t| t.len()).unwrap_or(0));
+            println!("Insider roster: {}", data.insider_roster.as_ref().map(|r| r.len()).unwrap_or(0));
+            println!("Insider buys: {}, sells: {}", data.insider_buy_count(), data.insider_sell_count());
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    // ========================================================================
+    // News Tests
+    // ========================================================================
+
+    println!("📰 Fetching news for AAPL...");
+    match get_news_for_symbol("AAPL", 5).await {
+        Ok(news) => {
+            println!("Found {} articles for {}", news.count, news.symbol.as_deref().unwrap_or("N/A"));
+            for article in news.articles.iter().take(5) {
+                println!(
+                    "  {} - {} ({})",
+                    article.title,
+                    article.publisher.as_deref().unwrap_or("Unknown"),
+                    article.relative_time()
+                );
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("🔍 Searching news for 'technology stocks'...");
+    match search_news("technology stocks", 5).await {
+        Ok(news) => {
+            println!("Found {} articles", news.count);
+            for article in news.articles.iter().take(5) {
+                println!(
+                    "  {} - {}",
+                    article.title,
+                    article.publisher.as_deref().unwrap_or("Unknown")
+                );
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("🌐 Fetching market news...");
+    match get_market_news(5).await {
+        Ok(news) => {
+            println!("Found {} market news articles", news.count);
+            for article in news.articles.iter().take(5) {
+                println!("  {} ({})", article.title, article.relative_time());
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    // ========================================================================
+    // Analyst Data Tests
+    // ========================================================================
+
+    println!("📊 Fetching analyst recommendations for AAPL...");
+    match get_recommendations("AAPL").await {
+        Ok(recs) => {
+            if let Some(latest) = recs.first() {
+                println!(
+                    "Period: {} | Consensus: {} ({} analysts)",
+                    latest.period,
+                    latest.consensus(),
+                    latest.total_analysts()
+                );
+                println!(
+                    "  Strong Buy: {}, Buy: {}, Hold: {}, Sell: {}, Strong Sell: {}",
+                    latest.strong_buy, latest.buy, latest.hold, latest.sell, latest.strong_sell
+                );
+                println!("  Bullish: {:.1}%", latest.bullish_percent());
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📈 Fetching price targets for AAPL...");
+    match get_price_targets("AAPL").await {
+        Ok(targets) => {
+            println!(
+                "Current: ${:.2}",
+                targets.current_price.unwrap_or(0.0)
+            );
+            println!(
+                "Target Mean: ${:.2}, Median: ${:.2}",
+                targets.target_mean.unwrap_or(0.0),
+                targets.target_median.unwrap_or(0.0)
+            );
+            println!(
+                "Range: ${:.2} - ${:.2}",
+                targets.target_low.unwrap_or(0.0),
+                targets.target_high.unwrap_or(0.0)
+            );
+            if let Some(upside) = targets.upside_percent() {
+                println!("Upside potential: {:.1}%", upside);
+            }
+            println!(
+                "Analysts: {}",
+                targets.number_of_analysts.unwrap_or(0)
+            );
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("⬆️ Fetching upgrades/downgrades for AAPL...");
+    match get_upgrades_downgrades("AAPL").await {
+        Ok(changes) => {
+            println!("Recent rating changes:");
+            for change in changes.iter().take(5) {
+                let action = change.action.as_deref().unwrap_or("N/A");
+                let from = change.from_grade.as_deref().unwrap_or("N/A");
+                let to = change.to_grade.as_deref().unwrap_or("N/A");
+                let date = change.date.as_deref().unwrap_or("N/A");
+                println!("  {} - {} -> {} ({}) [{}]", change.firm, from, to, action, date);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📉 Fetching earnings history for AAPL...");
+    match get_earnings_history("AAPL").await {
+        Ok(history) => {
+            println!("Recent earnings:");
+            for item in history.iter().take(4) {
+                let beat = if item.beat_estimate() == Some(true) {
+                    "✓ Beat"
+                } else {
+                    "✗ Miss"
+                };
+                println!(
+                    "  {}: Actual ${:.2} vs Est ${:.2} ({}) - {:.1}% surprise",
+                    item.quarter.as_deref().unwrap_or("N/A"),
+                    item.eps_actual.unwrap_or(0.0),
+                    item.eps_estimate.unwrap_or(0.0),
+                    beat,
+                    item.surprise_percent.unwrap_or(0.0)
+                );
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📦 Fetching all analyst data for AAPL...");
+    match get_all_analyst_data("AAPL").await {
+        Ok(data) => {
+            println!("Symbol: {}", data.symbol);
+            println!(
+                "Recommendations: {}",
+                data.recommendations.as_ref().map(|r| r.len()).unwrap_or(0)
+            );
+            println!(
+                "Upgrades/Downgrades: {} (↑{} ↓{})",
+                data.upgrades_downgrades
+                    .as_ref()
+                    .map(|u| u.len())
+                    .unwrap_or(0),
+                data.upgrade_count(),
+                data.downgrade_count()
+            );
+            println!(
+                "Price Target: {}",
+                if data.price_target.is_some() {
+                    "✓"
+                } else {
+                    "✗"
+                }
+            );
+            println!(
+                "Earnings History: {}",
+                data.earnings_history.as_ref().map(|h| h.len()).unwrap_or(0)
+            );
+            if let Some(beat_rate) = data.earnings_beat_rate() {
+                println!("Earnings Beat Rate: {:.1}%", beat_rate);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    // ========================================================================
+    // Calendar Data Tests
+    // ========================================================================
+
+    println!("📅 Fetching earnings calendar for AAPL...");
+    match get_earnings_calendar("AAPL").await {
+        Ok(earnings) => {
+            println!("Next earnings: {}", earnings.date_display());
+            if let Some(avg) = earnings.earnings_average {
+                println!("EPS estimate: ${:.2}", avg);
+            }
+            if let (Some(low), Some(high)) = (earnings.earnings_low, earnings.earnings_high) {
+                println!("EPS range: ${:.2} - ${:.2}", low, high);
+            }
+            if let Some(rev) = earnings.revenue_average {
+                println!("Revenue estimate: ${}", format_large_number(rev as i64));
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("💰 Fetching dividend calendar for AAPL...");
+    match get_dividend_calendar("AAPL").await {
+        Ok(dividend) => {
+            if let Some(ex_date) = &dividend.ex_dividend_date {
+                println!("Ex-dividend date: {}", ex_date);
+            }
+            if let Some(div_date) = &dividend.dividend_date {
+                println!("Dividend date: {}", div_date);
+            }
+            if let Some(rate) = dividend.dividend_rate {
+                println!("Annual dividend: ${:.2}", rate);
+            }
+            if let Some(yield_pct) = dividend.dividend_yield {
+                println!("Dividend yield: {:.2}%", yield_pct * 100.0);
+            }
+            if let Some(payout) = dividend.payout_ratio {
+                println!("Payout ratio: {:.1}%", payout * 100.0);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📆 Fetching full calendar for AAPL...");
+    match get_full_calendar("AAPL").await {
+        Ok(calendar) => {
+            println!("Symbol: {}", calendar.symbol);
+            println!(
+                "Earnings: {}",
+                if calendar.earnings.is_some() { "✓" } else { "✗" }
+            );
+            println!(
+                "Dividend: {}",
+                if calendar.dividend.is_some() { "✓" } else { "✗" }
+            );
+            println!(
+                "Split info: {}",
+                if calendar.split.is_some() { "✓" } else { "✗" }
+            );
+            println!(
+                "Has upcoming events: {}",
+                if calendar.has_upcoming_events() { "Yes" } else { "No" }
+            );
+            if let Some(next) = calendar.next_event_date() {
+                println!("Next event: {}", next);
             }
         }
         Err(e) => println!("Error: {}", e),
