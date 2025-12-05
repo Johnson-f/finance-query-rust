@@ -5,6 +5,8 @@ mod historical;
 mod holder;
 mod news;
 mod quotes;
+mod sector;
+mod stream;
 
 use analysts::{
     get_all_analyst_data, get_earnings_history, get_price_targets, get_recommendations,
@@ -22,6 +24,8 @@ use quotes::{
     get_detailed_quote, get_logo_url, get_similar_quotes, get_simple_quotes,
     DetailedQuoteResponse, SimpleQuotesResponse, SimilarQuotesResponse,
 };
+use sector::{get_all_sectors, get_all_sectors_performance, get_sector_performance, Sector};
+use stream::{stream_indices, stream_movers, stream_quotes, stream_single_quote, MoverCount};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -719,7 +723,87 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("Error: {}", e),
     }
 
-    println!("\n✅ All functions tested!");
+    // ========================================================================
+    // Sector Data Tests
+    // ========================================================================
+
+    println!("🏭 Fetching all available sectors...");
+    let sectors = get_all_sectors();
+    println!("Available sectors ({}):", sectors.len());
+    for sector in &sectors {
+        println!("  - {}", sector.as_str());
+    }
+    println!();
+
+    println!("📊 Fetching sector performance for Technology...");
+    match get_sector_performance(Sector::Technology).await {
+        Ok(perf) => {
+            println!("Sector: {}", perf.sector);
+            println!("Day Return: {}", perf.day_return_formatted());
+            println!("YTD Return: {}", perf.ytd_return_formatted());
+            println!("1Y Return: {:+.2}%", perf.year_return);
+            println!("Positive day: {}", if perf.is_positive_day() { "Yes" } else { "No" });
+            println!("Positive YTD: {}", if perf.is_positive_ytd() { "Yes" } else { "No" });
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    println!("📈 Fetching all sectors performance...");
+    match get_all_sectors_performance().await {
+        Ok(overview) => {
+            println!("Best performer: {}", overview.best_performer.as_deref().unwrap_or("N/A"));
+            println!("Worst performer: {}", overview.worst_performer.as_deref().unwrap_or("N/A"));
+            println!("\nSectors by day return:");
+            for sector in overview.sorted_by_day_return() {
+                println!("  {} - {}", sector.sector, sector.day_return_formatted());
+            }
+            println!("\nPositive sectors: {}", overview.positive_sectors().len());
+            println!("Negative sectors: {}", overview.negative_sectors().len());
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    println!();
+
+    // ========================================================================
+    // Streaming Tests (limited to 2 updates each for testing)
+    // ========================================================================
+
+    println!("🔄 Testing streaming functionality...\n");
+
+    // Test quote streaming
+    println!("📈 Testing quote stream (2 updates)...");
+    match stream_quotes(vec!["AAPL", "GOOGL"], 3, Some(2)).await {
+        Ok(_) => println!("Quote stream completed successfully"),
+        Err(e) => println!("Quote stream error: {}", e),
+    }
+    println!();
+
+    // Test single quote streaming
+    println!("📊 Testing single quote stream for NVDA (2 updates)...");
+    match stream_single_quote("NVDA", 3, Some(2)).await {
+        Ok(_) => println!("Single quote stream completed successfully"),
+        Err(e) => println!("Single quote stream error: {}", e),
+    }
+    println!();
+
+    // Test index streaming
+    println!("📊 Testing index stream (2 updates)...");
+    match stream_indices(vec!["^GSPC", "^DJI", "^IXIC"], 3, Some(2)).await {
+        Ok(_) => println!("Index stream completed successfully"),
+        Err(e) => println!("Index stream error: {}", e),
+    }
+    println!();
+
+    // Test movers streaming
+    println!("🔥 Testing market movers stream (2 updates)...");
+    match stream_movers(MoverCount::TwentyFive, 5, Some(2)).await {
+        Ok(_) => println!("Movers stream completed successfully"),
+        Err(e) => println!("Movers stream error: {}", e),
+    }
+    println!();
+
+    println!("\n✅ All functions tested (including streaming)!");
     Ok(())
 }
 
