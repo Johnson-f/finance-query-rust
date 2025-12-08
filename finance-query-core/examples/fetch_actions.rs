@@ -3,13 +3,17 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize client
-    let fetch_client = Arc::new(FetchClient::new(None)?);
+    // Optional proxy for Yahoo (set PROXY_URL to enable)
+    let proxy = std::env::var("PROXY_URL").ok();
+
+    // Initialize client with shared cookie jar
+    let fetch_client = Arc::new(FetchClient::new(proxy.clone())?);
     let cookie_jar = fetch_client.cookie_jar().clone();
-    let auth_manager = Arc::new(YahooAuthManager::new(None, cookie_jar));
+    // Pass the same proxy to the auth manager so both auth and data requests share config
+    let auth_manager = Arc::new(YahooAuthManager::new(proxy, cookie_jar));
     let client = YahooFinanceClient::new(auth_manager.clone(), fetch_client);
 
-    // Authenticate
+    // Authenticate (uses new dual-path auth: basic crumb, then consent/CSRF fallback)
     auth_manager.refresh().await?;
 
     // Fetch all actions

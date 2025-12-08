@@ -50,6 +50,17 @@ impl YahooFinanceClient {
                 info!("Auth refreshed, retrying request");
                 self.yahoo_request_inner(url, params).await
             }
+            Err(YahooError::HttpError(code, msg))
+                if code != 404 && code != 429 && code >= 400 =>
+            {
+                warn!(
+                    "HTTP {} indicating possible auth issue ({}). Switching auth strategy and retrying once.",
+                    code, msg
+                );
+                self.auth_manager.switch_strategy_and_refresh().await?;
+                info!("Strategy switched, retrying request");
+                self.yahoo_request_inner(url, params).await
+            }
             Err(e) => Err(e),
         }
     }
