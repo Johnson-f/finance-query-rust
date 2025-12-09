@@ -9,17 +9,20 @@ use std::sync::Arc;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Testing finance-query-core with real Yahoo Finance data...\n");
 
-    // 1. Create the fetch client (no proxy)
-    let fetch_client = Arc::new(FetchClient::new(None)?);
+    // Optional proxy for Yahoo (set PROXY_URL to enable)
+    let proxy = std::env::var("PROXY_URL").ok();
+
+    // 1. Create the fetch client (with optional proxy)
+    let fetch_client = Arc::new(FetchClient::new(proxy.clone())?);
     
-    // 2. Create auth manager
+    // 2. Create auth manager (shares the same proxy)
     let cookie_jar = fetch_client.cookie_jar().clone();
-    let auth_manager = Arc::new(YahooAuthManager::new(None, cookie_jar));
+    let auth_manager = Arc::new(YahooAuthManager::new(proxy, cookie_jar));
     
     // 3. Create Yahoo Finance client
     let client = YahooFinanceClient::new(auth_manager.clone(), fetch_client.clone());
 
-    // 4. Prime authentication
+    // 4. Prime authentication (dual-path: basic crumb then consent/CSRF fallback)
     println!("📡 Authenticating with Yahoo Finance...");
     auth_manager.refresh().await?;
     println!("✅ Authentication successful!\n");
