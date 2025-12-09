@@ -71,7 +71,10 @@ impl MarketStatus {
 
         Ok(Self {
             market,
-            status: market_time.status.clone().unwrap_or_else(|| "unknown".to_string()),
+            status: market_time
+                .status
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string()),
             open_time,
             close_time,
             timezone: timezone_info.and_then(|tz| tz.long.clone()),

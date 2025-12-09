@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-09
+
+### Changed
+- Redesigned Yahoo authentication to stay headless (no login page) with dual crumb strategies: basic `fc.yahoo.com`/`query1` path and consent/CSRF `guce`/`query2` fallback, automatically switching on auth/429 errors.
+- Hardened refresh behavior with cached crumb reuse, minimum refresh interval, and clearer logging/errors to surface invalid crumbs.
+- Proxy-friendly auth and example updates: examples now respect `PROXY_URL`, and auth requests accept proxy certificates to support VPS/proxy deployments.
+
 ## [0.2.0] - 2025-12-01
 
 ### Added
@@ -88,5 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sector performance
 - Basic streaming support
 
+[0.3.0]: https://github.com/johnson-f/finance-query-rust/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/johnson-f/finance-query-rust/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/johnson-f/finance-query-rust/releases/tag/v0.1.0

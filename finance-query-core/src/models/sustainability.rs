@@ -30,13 +30,9 @@ impl SustainabilityScores {
         symbol: String,
         response: YahooEsgResponse,
     ) -> Result<Self, crate::client::YahooError> {
-        let result = response
-            .quote_summary
-            .result
-            .first()
-            .ok_or_else(|| {
-                crate::client::YahooError::ParseError("No ESG data in response".to_string())
-            })?;
+        let result = response.quote_summary.result.first().ok_or_else(|| {
+            crate::client::YahooError::ParseError("No ESG data in response".to_string())
+        })?;
 
         let esg = &result.esg_scores;
 

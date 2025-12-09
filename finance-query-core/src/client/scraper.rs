@@ -71,7 +71,6 @@ pub async fn scrape_quote(
     }))
 }
 
-
 // Extract value from fin-streamer elements (current Yahoo format)
 fn extract_fin_streamer_value(document: &Html, data_field: &str) -> Option<f64> {
     let selector =
@@ -182,7 +181,6 @@ fn extract_json_object(json_str: &str) -> Result<Value, YahooError> {
         ))
     }
 }
-
 
 // Helper function to find transcript data in nested JSON structure (root.App.main[0][3][1][0])
 fn find_transcript_in_nested_json(value: &Value) -> Option<Value> {
@@ -365,7 +363,6 @@ pub async fn scrape_earnings_calls_list(
     Ok(calls)
 }
 
-
 /// Scrape earnings transcript from a URL.
 pub async fn scrape_earnings_transcript_from_url(
     fetch_client: &Arc<FetchClient>,
@@ -448,10 +445,7 @@ pub async fn scrape_earnings_transcript_from_url(
     for selector_str in transcript_selectors {
         if let Ok(selector) = Selector::parse(selector_str) {
             if document.select(&selector).next().is_some() {
-                debug!(
-                    "Found transcript container with selector: {}",
-                    selector_str
-                );
+                debug!("Found transcript container with selector: {}", selector_str);
                 // Extract transcript from DOM
                 return extract_transcript_from_dom(&document, selector_str);
             }
@@ -462,7 +456,6 @@ pub async fn scrape_earnings_transcript_from_url(
     warn!("Could not find structured transcript data, attempting generic extraction");
     extract_transcript_from_dom_generic(&document)
 }
-
 
 fn extract_transcript_from_dom(
     document: &Html,
@@ -477,15 +470,11 @@ fn extract_transcript_from_dom(
     let mut speaker_mapping = std::collections::HashMap::new();
 
     // Try to find speaker elements and transcript paragraphs
-    let speaker_selector =
-        Selector::parse("div[class*='speaker'], span[class*='speaker'], strong").map_err(|e| {
-            YahooError::ParseError(format!("Failed to parse speaker selector: {}", e))
-        })?;
+    let speaker_selector = Selector::parse("div[class*='speaker'], span[class*='speaker'], strong")
+        .map_err(|e| YahooError::ParseError(format!("Failed to parse speaker selector: {}", e)))?;
 
-    let text_selector =
-        Selector::parse("p, div[class*='text'], div[class*='paragraph']").map_err(|e| {
-            YahooError::ParseError(format!("Failed to parse text selector: {}", e))
-        })?;
+    let text_selector = Selector::parse("p, div[class*='text'], div[class*='paragraph']")
+        .map_err(|e| YahooError::ParseError(format!("Failed to parse text selector: {}", e)))?;
 
     if let Some(container) = document.select(&container_sel).next() {
         let mut current_speaker = "Unknown".to_string();
@@ -539,7 +528,6 @@ fn extract_transcript_from_dom(
         }
     }))
 }
-
 
 fn extract_transcript_from_dom_generic(document: &Html) -> Result<Value, YahooError> {
     // Generic extraction - look for any text content that might be transcript

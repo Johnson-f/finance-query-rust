@@ -34,65 +34,63 @@ pub mod utils;
 pub mod websocket;
 
 // Re-export client types
-pub use client::{FetchClient, YahooAuthManager, YahooFinanceClient, YahooError};
+pub use client::{FetchClient, YahooAuthManager, YahooError, YahooFinanceClient};
 
 // Re-export websocket types
-pub use websocket::{QuotesUpdate, ProfileUpdate, MoversUpdate, MarketHours, MovingAverageUpdate};
+pub use websocket::{MarketHours, MoversUpdate, MovingAverageUpdate, ProfileUpdate, QuotesUpdate};
 
 // Re-export streaming types
-pub use streaming::{QuoteStream, SingleQuoteStream, IndexStream, MoversStream};
+pub use streaming::{IndexStream, MoversStream, QuoteStream, SingleQuoteStream};
 
 // Re-export quote models
-pub use models::{Quote, SimpleQuote, DetailedQuote};
+pub use models::{DetailedQuote, Quote, SimpleQuote};
 
 // Re-export historical models
-pub use models::{HistoricalData, HistoricalResponse, TimeRange, Interval, IndicatorType};
+pub use models::{HistoricalData, HistoricalResponse, IndicatorType, Interval, TimeRange};
 
 // Re-export news models
 pub use models::News;
 
 // Re-export search models
-pub use models::{SearchResult, SearchResponse};
+pub use models::{SearchResponse, SearchResult};
 
 // Re-export financial models
-pub use models::{FinancialStatement, StatementType, Frequency};
+pub use models::{FinancialStatement, Frequency, StatementType};
 
 // Re-export movers models
-pub use models::{MoverCount, MarketMover};
+pub use models::{MarketMover, MoverCount};
 
 // Re-export indices models
-pub use models::{Region, Index, MarketIndex, get_index_regions};
+pub use models::{get_index_regions, Index, MarketIndex, Region};
 
 // Re-export holders models
 pub use models::{
-    HolderType, MajorHoldersBreakdown, InstitutionalHolder, MutualFundHolder,
-    InsiderTransaction, InsiderPurchase, InsiderRosterMember,
-    MajorHoldersResponse, InstitutionalHoldersResponse, MutualFundHoldersResponse,
-    InsiderTransactionsResponse, InsiderPurchasesResponse, InsiderRosterResponse,
-    HoldersData,
+    HolderType, HoldersData, InsiderPurchase, InsiderPurchasesResponse, InsiderRosterMember,
+    InsiderRosterResponse, InsiderTransaction, InsiderTransactionsResponse, InstitutionalHolder,
+    InstitutionalHoldersResponse, MajorHoldersBreakdown, MajorHoldersResponse, MutualFundHolder,
+    MutualFundHoldersResponse,
 };
 
 // Re-export analysts models
 pub use models::{
-    AnalysisType, RecommendationData, UpgradeDowngrade, PriceTarget,
-    EarningsEstimate, RevenueEstimate, EarningsHistoryItem,
-    RecommendationsResponse, UpgradesDowngradesResponse, PriceTargetsResponse,
-    EarningsEstimateResponse, RevenueEstimateResponse, EarningsHistoryResponse,
-    EpsTrend, EpsRevisions, GrowthEstimate,
-    EpsTrendResponse, EpsRevisionsResponse, GrowthEstimatesResponse,
+    AnalysisType, EarningsEstimate, EarningsEstimateResponse, EarningsHistoryItem,
+    EarningsHistoryResponse, EpsRevisions, EpsRevisionsResponse, EpsTrend, EpsTrendResponse,
+    GrowthEstimate, GrowthEstimatesResponse, PriceTarget, PriceTargetsResponse, RecommendationData,
+    RecommendationsResponse, RevenueEstimate, RevenueEstimateResponse, UpgradeDowngrade,
+    UpgradesDowngradesResponse,
 };
 
 // Re-export sectors models
-pub use models::{Sector, MarketSector, MarketSectorDetails};
+pub use models::{MarketSector, MarketSectorDetails, Sector};
 
 // Re-export earnings transcripts models
 pub use models::{
-    Quarter, EarningsCallListing, EarningsCallsList, TranscriptSpeaker,
-    TranscriptParagraph, EarningsTranscript,
+    EarningsCallListing, EarningsCallsList, EarningsTranscript, Quarter, TranscriptParagraph,
+    TranscriptSpeaker,
 };
 
 // Re-export actions models
-pub use models::{ActionsResponse, Dividend, StockSplit, CapitalGain};
+pub use models::{ActionsResponse, CapitalGain, Dividend, StockSplit};
 
 // Re-export options models
 pub use models::{OptionChain, OptionContract, OptionExpirations};
@@ -101,7 +99,7 @@ pub use models::{OptionChain, OptionContract, OptionExpirations};
 pub use models::Calendar;
 
 // Re-export SEC filings models
-pub use models::{SecFiling, SecFilingsResponse, SecExhibit};
+pub use models::{SecExhibit, SecFiling, SecFilingsResponse};
 
 // Re-export sustainability/ESG models
 pub use models::SustainabilityScores;

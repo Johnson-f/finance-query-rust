@@ -61,7 +61,6 @@ pub enum Index {
     #[serde(rename = "ibrx-50")]
     Ibrx50, // Brazil IBrX-50
 
-
     // Europe
     #[serde(rename = "ftse-100")]
     Ftse, // FTSE 100
@@ -193,7 +192,6 @@ pub enum Index {
     Buk100p, // CBOE UK 100
 }
 
-
 impl Index {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -272,7 +270,6 @@ impl Index {
             Index::Buk100p => "cboe-uk-100",
         }
     }
-
 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
@@ -355,26 +352,82 @@ impl Index {
 
     pub fn all() -> Vec<Index> {
         vec![
-            Index::Gspc, Index::Dji, Index::Ixic, Index::Nya, Index::Xax, Index::Rut, Index::Vix,
+            Index::Gspc,
+            Index::Dji,
+            Index::Ixic,
+            Index::Nya,
+            Index::Xax,
+            Index::Rut,
+            Index::Vix,
             Index::Gsptse,
-            Index::Bvsp, Index::Mxx, Index::Ipsa, Index::Merv, Index::Ivbx, Index::Ibrx50,
-            Index::Ftse, Index::Gdaxi, Index::Fchi, Index::Stoxx50e, Index::N100, Index::Bfx,
-            Index::MoexMe, Index::Aex, Index::Ibex, Index::Ftsemib, Index::Ssmi, Index::Psi,
-            Index::Atx, Index::Omxs30, Index::Omxc25, Index::Wig20, Index::Bux, Index::Imoex,
+            Index::Bvsp,
+            Index::Mxx,
+            Index::Ipsa,
+            Index::Merv,
+            Index::Ivbx,
+            Index::Ibrx50,
+            Index::Ftse,
+            Index::Gdaxi,
+            Index::Fchi,
+            Index::Stoxx50e,
+            Index::N100,
+            Index::Bfx,
+            Index::MoexMe,
+            Index::Aex,
+            Index::Ibex,
+            Index::Ftsemib,
+            Index::Ssmi,
+            Index::Psi,
+            Index::Atx,
+            Index::Omxs30,
+            Index::Omxc25,
+            Index::Wig20,
+            Index::Bux,
+            Index::Imoex,
             Index::Rtsi,
-            Index::Hsi, Index::Sti, Index::Bsesn, Index::Jkse, Index::Klse, Index::Ks11,
-            Index::Twii, Index::N225, Index::Shanghai, Index::Szse, Index::Set, Index::Nsei,
-            Index::Cnx200, Index::Psei, Index::ChinaA50, Index::Djsh, Index::Indiavix,
-            Index::Case30, Index::Jn0uJo, Index::Ftsejse, Index::Afr40, Index::Raf40, Index::Sa40,
+            Index::Hsi,
+            Index::Sti,
+            Index::Bsesn,
+            Index::Jkse,
+            Index::Klse,
+            Index::Ks11,
+            Index::Twii,
+            Index::N225,
+            Index::Shanghai,
+            Index::Szse,
+            Index::Set,
+            Index::Nsei,
+            Index::Cnx200,
+            Index::Psei,
+            Index::ChinaA50,
+            Index::Djsh,
+            Index::Indiavix,
+            Index::Case30,
+            Index::Jn0uJo,
+            Index::Ftsejse,
+            Index::Afr40,
+            Index::Raf40,
+            Index::Sa40,
             Index::Alt15,
-            Index::Ta125Ta, Index::Ta35, Index::Tasi, Index::Tamayuz, Index::Bist100,
-            Index::Axjo, Index::Aord, Index::Nz50,
-            Index::DxYNyb, Index::UsdStrd, Index::Xdb, Index::Xde, Index::Xdn, Index::Xda,
-            Index::MsciWorld, Index::Buk100p,
+            Index::Ta125Ta,
+            Index::Ta35,
+            Index::Tasi,
+            Index::Tamayuz,
+            Index::Bist100,
+            Index::Axjo,
+            Index::Aord,
+            Index::Nz50,
+            Index::DxYNyb,
+            Index::UsdStrd,
+            Index::Xdb,
+            Index::Xde,
+            Index::Xdn,
+            Index::Xda,
+            Index::MsciWorld,
+            Index::Buk100p,
         ]
     }
 }
-
 
 pub fn get_index_regions() -> HashMap<Index, Region> {
     let mut map = HashMap::new();
@@ -492,7 +545,6 @@ pub struct MarketIndex {
     #[serde(skip_serializing_if = "Option::is_none", rename = "maxReturn")]
     pub max_return: Option<String>,
 }
-
 
 #[cfg(test)]
 mod tests {

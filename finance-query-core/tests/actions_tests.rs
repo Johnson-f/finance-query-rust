@@ -46,7 +46,9 @@ async fn test_get_actions() {
 async fn test_capital_gains_etf() {
     let client = setup_client().await;
     let actions = client.get_actions("SPY", "5y").await.unwrap();
-    // SPY is an ETF and may have capital gains
-    // Just verify it doesn't error
-    assert!(actions.capital_gains.len() >= 0);
+    // SPY is an ETF and may have capital gains; call should succeed even if empty
+    assert!(
+        actions.capital_gains.iter().all(|cg| cg.amount >= 0.0),
+        "capital gains amounts should be non-negative"
+    );
 }

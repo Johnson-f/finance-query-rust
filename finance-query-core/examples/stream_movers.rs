@@ -1,4 +1,6 @@
-use finance_query_core::{FetchClient, MoverCount, MoversStream, YahooAuthManager, YahooFinanceClient};
+use finance_query_core::{
+    FetchClient, MoverCount, MoversStream, YahooAuthManager, YahooFinanceClient,
+};
 use futures_util::StreamExt;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,7 +21,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Press Ctrl+C to stop\n");
 
     // Create stream for market movers
-    let mut stream = MoversStream::new(client.clone(), MoverCount::Fifty, Duration::from_secs(5));
+    let mut stream =
+        MoversStream::create(client.clone(), MoverCount::Fifty, Duration::from_secs(5));
 
     // Stream updates
     let mut count = 0;
@@ -28,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(update) => {
                 count += 1;
                 println!("=== Update #{} ===", count);
-                
+
                 // Show top 5 from each category
                 println!("\n📈 Top 5 Gainers:");
                 for (i, mover) in update.gainers.iter().take(5).enumerate() {
@@ -65,10 +68,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         mover.percent_change
                     );
                 }
-                
+
                 println!("\nTimestamp: {}", update.timestamp);
                 println!();
-                
+
                 // Stop after 5 updates for demo purposes
                 if count >= 5 {
                     println!("Demo complete - received 5 updates");

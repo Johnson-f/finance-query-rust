@@ -60,7 +60,6 @@ pub struct UpgradeDowngrade {
     pub date: Option<DateTime<Utc>>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceTarget {
     #[serde(skip_serializing_if = "Option::is_none")]

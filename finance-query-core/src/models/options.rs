@@ -44,9 +44,7 @@ impl OptionChain {
         })?;
 
         let options_data = result.options.first().ok_or_else(|| {
-            crate::client::YahooError::ParseError(
-                "No options data for expiration".to_string(),
-            )
+            crate::client::YahooError::ParseError("No options data for expiration".to_string())
         })?;
 
         let calls = options_data

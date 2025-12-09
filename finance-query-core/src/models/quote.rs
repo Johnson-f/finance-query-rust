@@ -110,7 +110,6 @@ pub struct SimpleQuote {
     pub logo: Option<String>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetailedQuote {
     pub symbol: String,
@@ -163,7 +162,10 @@ pub struct DetailedQuote {
     pub last_capital_gain: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "morningstarRating")]
     pub morningstar_rating: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "morningstarRiskRating")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "morningstarRiskRating"
+    )]
     pub morningstar_risk_rating: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "holdingsTurnover")]
     pub holdings_turnover: Option<String>,
@@ -258,7 +260,6 @@ impl From<Quote> for DetailedQuote {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

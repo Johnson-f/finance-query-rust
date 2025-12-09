@@ -16,7 +16,7 @@ impl IndicatorType {
             _ => None,
         }
     }
-    
+
     pub fn parse_list(s: &str) -> HashSet<Self> {
         s.split(',')
             .map(|s| s.trim())
@@ -69,7 +69,6 @@ impl TimeRange {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -143,7 +142,6 @@ pub struct HistoricalData {
 pub struct HistoricalResponse {
     pub data: std::collections::HashMap<String, HistoricalData>,
 }
-
 
 #[cfg(test)]
 mod tests {

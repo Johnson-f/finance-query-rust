@@ -37,7 +37,7 @@ impl QuoteStream {
     /// use futures_util::StreamExt;
     ///
     /// let stream = QuoteStream::create(&client, vec!["AAPL", "GOOGL"], Duration::from_secs(5));
-    /// 
+    ///
     /// while let Some(result) = stream.next().await {
     ///     match result {
     ///         Ok(update) => println!("Got {} quotes", update.len()),
@@ -52,13 +52,13 @@ impl QuoteStream {
     ) -> Pin<Box<dyn Stream<Item = Result<QuotesUpdate, YahooError>> + Send>> {
         Box::pin(stream! {
             let mut ticker = interval(poll_interval);
-            
+
             loop {
                 ticker.tick().await;
                 debug!("Fetching quotes for {:?}", symbols);
-                
+
                 let symbol_refs: Vec<&str> = symbols.iter().map(|s| s.as_str()).collect();
-                
+
                 match client.get_simple_quotes(&symbol_refs).await {
                     Ok(data) => {
                         let quotes = parse_simple_quotes(&data);
@@ -95,11 +95,11 @@ impl SingleQuoteStream {
     ) -> Pin<Box<dyn Stream<Item = Result<SimpleQuote, YahooError>> + Send>> {
         Box::pin(stream! {
             let mut ticker = interval(poll_interval);
-            
+
             loop {
                 ticker.tick().await;
                 debug!("Fetching quote for {}", symbol);
-                
+
                 match client.get_simple_quotes(&[symbol.as_str()]).await {
                     Ok(data) => {
                         let quotes = parse_simple_quotes(&data);
@@ -137,7 +137,7 @@ impl IndexStream {
     /// // Stream S&P 500, Dow Jones, and NASDAQ
     /// let symbols = vec!["^GSPC".to_string(), "^DJI".to_string(), "^IXIC".to_string()];
     /// let stream = IndexStream::create(&client, symbols, Duration::from_secs(5));
-    /// 
+    ///
     /// while let Some(result) = stream.next().await {
     ///     match result {
     ///         Ok(indices) => {
@@ -153,16 +153,17 @@ impl IndexStream {
         client: Arc<YahooFinanceClient>,
         index_symbols: Vec<String>,
         poll_interval: Duration,
-    ) -> Pin<Box<dyn Stream<Item = Result<Vec<crate::models::MarketIndex>, YahooError>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<crate::models::MarketIndex>, YahooError>> + Send>>
+    {
         Box::pin(stream! {
             let mut ticker = interval(poll_interval);
-            
+
             loop {
                 ticker.tick().await;
                 debug!("Fetching index data for {:?}", index_symbols);
-                
+
                 let symbol_refs: Vec<&str> = index_symbols.iter().map(|s| s.as_str()).collect();
-                
+
                 match client.get_simple_quotes(&symbol_refs).await {
                     Ok(data) => {
                         let indices = parse_market_indices(&data);
@@ -181,7 +182,8 @@ impl IndexStream {
     pub fn with_default_interval(
         client: Arc<YahooFinanceClient>,
         index_symbols: Vec<String>,
-    ) -> Pin<Box<dyn Stream<Item = Result<Vec<crate::models::MarketIndex>, YahooError>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<crate::models::MarketIndex>, YahooError>> + Send>>
+    {
         Self::create(client, index_symbols, Duration::from_secs(5))
     }
 
@@ -189,11 +191,12 @@ impl IndexStream {
     pub fn us_major_indices(
         client: Arc<YahooFinanceClient>,
         poll_interval: Duration,
-    ) -> Pin<Box<dyn Stream<Item = Result<Vec<crate::models::MarketIndex>, YahooError>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<crate::models::MarketIndex>, YahooError>> + Send>>
+    {
         let symbols = vec![
-            "^GSPC".to_string(),  // S&P 500
-            "^DJI".to_string(),   // Dow Jones
-            "^IXIC".to_string(),  // NASDAQ
+            "^GSPC".to_string(), // S&P 500
+            "^DJI".to_string(),  // Dow Jones
+            "^IXIC".to_string(), // NASDAQ
         ];
         Self::create(client, symbols, poll_interval)
     }
@@ -208,7 +211,8 @@ fn get_quote_results(data: &Value) -> Option<&Vec<Value>> {
 
 /// Helper to extract string field from JSON, with fallback.
 fn get_string_field(result: &Value, field: &str, fallback: &str) -> String {
-    result.get(field)
+    result
+        .get(field)
         .and_then(|s| s.as_str())
         .unwrap_or(fallback)
         .to_string()
@@ -216,7 +220,8 @@ fn get_string_field(result: &Value, field: &str, fallback: &str) -> String {
 
 /// Helper to extract name field (tries longName, then shortName).
 fn get_name_field(result: &Value) -> String {
-    result.get("longName")
+    result
+        .get("longName")
         .or_else(|| result.get("shortName"))
         .and_then(|n| n.as_str())
         .unwrap_or("")
@@ -228,32 +233,38 @@ fn parse_simple_quotes(data: &Value) -> Vec<SimpleQuote> {
     let Some(results) = get_quote_results(data) else {
         return Vec::new();
     };
-    
-    results.iter().map(|result| {
-        SimpleQuote {
+
+    results
+        .iter()
+        .map(|result| SimpleQuote {
             symbol: get_string_field(result, "symbol", ""),
             name: get_name_field(result),
-            price: result.get("regularMarketPrice")
+            price: result
+                .get("regularMarketPrice")
                 .and_then(|p| p.as_f64())
                 .map(|p| format!("{:.2}", p))
                 .unwrap_or_else(|| "0.00".to_string()),
-            pre_market_price: result.get("preMarketPrice")
+            pre_market_price: result
+                .get("preMarketPrice")
                 .and_then(|p| p.as_f64())
                 .map(|p| format!("{:.2}", p)),
-            after_hours_price: result.get("postMarketPrice")
+            after_hours_price: result
+                .get("postMarketPrice")
                 .and_then(|p| p.as_f64())
                 .map(|p| format!("{:.2}", p)),
-            change: result.get("regularMarketChange")
+            change: result
+                .get("regularMarketChange")
                 .and_then(|c| c.as_f64())
                 .map(|c| format!("{:+.2}", c))
                 .unwrap_or_else(|| "0.00".to_string()),
-            percent_change: result.get("regularMarketChangePercent")
+            percent_change: result
+                .get("regularMarketChangePercent")
                 .and_then(|p| p.as_f64())
                 .map(|p| format!("{:+.2}%", p))
                 .unwrap_or_else(|| "0.00%".to_string()),
             logo: None,
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 /// A stream that yields market movers (actives, gainers, losers) at regular intervals.
@@ -274,7 +285,7 @@ impl MoversStream {
     /// use futures_util::StreamExt;
     ///
     /// let stream = MoversStream::create(&client, MoverCount::Fifty, Duration::from_secs(5));
-    /// 
+    ///
     /// while let Some(result) = stream.next().await {
     ///     match result {
     ///         Ok(update) => {
@@ -290,14 +301,15 @@ impl MoversStream {
         client: Arc<YahooFinanceClient>,
         count: crate::models::MoverCount,
         poll_interval: Duration,
-    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>>
+    {
         Box::pin(stream! {
             let mut ticker = interval(poll_interval);
-            
+
             loop {
                 ticker.tick().await;
                 debug!("Fetching market movers (count: {})", count.as_str());
-                
+
                 match client.get_movers(count).await {
                     Ok((actives, gainers, losers)) => {
                         let update = crate::websocket::MoversUpdate::with_timestamp(
@@ -321,15 +333,21 @@ impl MoversStream {
     pub fn with_default_interval(
         client: Arc<YahooFinanceClient>,
         count: crate::models::MoverCount,
-    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>>
+    {
         Self::create(client, count, Duration::from_secs(5))
     }
 
     /// Create a movers stream with default count (50) and interval (5 seconds).
     pub fn with_defaults(
         client: Arc<YahooFinanceClient>,
-    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>> {
-        Self::create(client, crate::models::MoverCount::default(), Duration::from_secs(5))
+    ) -> Pin<Box<dyn Stream<Item = Result<crate::websocket::MoversUpdate, YahooError>> + Send>>
+    {
+        Self::create(
+            client,
+            crate::models::MoverCount::default(),
+            Duration::from_secs(5),
+        )
     }
 }
 
@@ -338,41 +356,47 @@ fn parse_market_indices(data: &Value) -> Vec<crate::models::MarketIndex> {
     let Some(results) = get_quote_results(data) else {
         return Vec::new();
     };
-    
-    results.iter().map(|result| {
-        let value = result.get("regularMarketPrice")
-            .and_then(|p| p.as_f64())
-            .unwrap_or(0.0);
-        
-        let change = result.get("regularMarketChange")
-            .and_then(|c| c.as_f64())
-            .map(|c| format!("{:+.2}", c))
-            .unwrap_or_else(|| "0.00".to_string());
-        
-        let percent_change = result.get("regularMarketChangePercent")
-            .and_then(|p| p.as_f64())
-            .map(|p| format!("{:+.2}%", p))
-            .unwrap_or_else(|| "0.00%".to_string());
-        
-        // TODO: Yahoo Finance API doesn't provide historical return data in quote responses.
-        // These would need to be calculated from historical price data or fetched separately.
-        crate::models::MarketIndex {
-            name: get_name_field(result),
-            value,
-            change,
-            percent_change,
-            five_days_return: None,
-            one_month_return: None,
-            three_month_return: None,
-            six_month_return: None,
-            ytd_return: None,
-            year_return: None,
-            three_year_return: None,
-            five_year_return: None,
-            ten_year_return: None,
-            max_return: None,
-        }
-    }).collect()
+
+    results
+        .iter()
+        .map(|result| {
+            let value = result
+                .get("regularMarketPrice")
+                .and_then(|p| p.as_f64())
+                .unwrap_or(0.0);
+
+            let change = result
+                .get("regularMarketChange")
+                .and_then(|c| c.as_f64())
+                .map(|c| format!("{:+.2}", c))
+                .unwrap_or_else(|| "0.00".to_string());
+
+            let percent_change = result
+                .get("regularMarketChangePercent")
+                .and_then(|p| p.as_f64())
+                .map(|p| format!("{:+.2}%", p))
+                .unwrap_or_else(|| "0.00%".to_string());
+
+            // TODO: Yahoo Finance API doesn't provide historical return data in quote responses.
+            // These would need to be calculated from historical price data or fetched separately.
+            crate::models::MarketIndex {
+                name: get_name_field(result),
+                value,
+                change,
+                percent_change,
+                five_days_return: None,
+                one_month_return: None,
+                three_month_return: None,
+                six_month_return: None,
+                ytd_return: None,
+                year_return: None,
+                three_year_return: None,
+                five_year_return: None,
+                ten_year_return: None,
+                max_return: None,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -409,13 +433,13 @@ mod tests {
         // Test that we can create a MoversStream with different configurations
         // This is a compile-time test to ensure the API is correct
         use crate::models::MoverCount;
-        
+
         // These would require a real client to actually run, but we can verify
         // the types compile correctly
         let _count_25 = MoverCount::TwentyFive;
         let _count_50 = MoverCount::Fifty;
         let _count_100 = MoverCount::Hundred;
-        
+
         assert_eq!(_count_25.as_str(), "25");
         assert_eq!(_count_50.as_str(), "50");
         assert_eq!(_count_100.as_str(), "100");

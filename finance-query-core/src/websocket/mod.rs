@@ -6,9 +6,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Quote, SimpleQuote, News};
 use crate::models::movers::MarketMover;
 use crate::models::sectors::MarketSector;
+use crate::models::{News, Quote, SimpleQuote};
 
 /// Real-time quote update for streaming stock quotes.
 ///

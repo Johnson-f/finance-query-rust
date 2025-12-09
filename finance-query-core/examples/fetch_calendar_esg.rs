@@ -74,7 +74,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("No ESG data available for {}", symbol);
             }
         }
-        Err(e) => println!("ESG data not available: {} (Yahoo may have deprecated this endpoint)", e),
+        Err(e) => println!(
+            "ESG data not available: {} (Yahoo may have deprecated this endpoint)",
+            e
+        ),
     }
 
     Ok(())

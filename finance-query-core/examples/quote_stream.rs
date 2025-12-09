@@ -5,8 +5,7 @@
 //! Run with: cargo run --example quote_stream -p finance-query-core
 
 use finance_query_core::{
-    FetchClient, YahooAuthManager, YahooFinanceClient,
-    QuoteStream, SingleQuoteStream,
+    FetchClient, QuoteStream, SingleQuoteStream, YahooAuthManager, YahooFinanceClient,
 };
 use futures_util::StreamExt;
 use std::sync::Arc;
@@ -29,21 +28,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 1: Stream multiple quotes
     println!("=== Multi-Quote Stream (3 updates, 2-second interval) ===\n");
-    
+
     let symbols = vec!["AAPL".to_string(), "GOOGL".to_string(), "MSFT".to_string()];
-    let mut stream = QuoteStream::new(client.clone(), symbols, Duration::from_secs(2));
-    
+    let mut stream = QuoteStream::create(client.clone(), symbols, Duration::from_secs(2));
+
     let mut count = 0;
     while let Some(result) = stream.next().await {
         count += 1;
         match result {
             Ok(update) => {
-                println!("Update #{} - {} quotes at {}", count, update.len(), update.timestamp.format("%H:%M:%S"));
+                println!(
+                    "Update #{} - {} quotes at {}",
+                    count,
+                    update.len(),
+                    update.timestamp.format("%H:%M:%S")
+                );
                 for quote in &update.quotes {
-                    println!("  {} ({}): ${} | {} ({})", 
-                        quote.symbol, 
+                    println!(
+                        "  {} ({}): ${} | {} ({})",
+                        quote.symbol,
                         truncate(&quote.name, 15),
-                        quote.price, 
+                        quote.price,
                         quote.change,
                         quote.percent_change
                     );
@@ -54,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("Error: {}", e);
             }
         }
-        
+
         if count >= 3 {
             break;
         }
@@ -62,31 +67,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demo 2: Stream single quote
     println!("=== Single Quote Stream (TSLA, 3 updates) ===\n");
-    
-    let mut single_stream = SingleQuoteStream::new(
-        client.clone(), 
-        "TSLA".to_string(), 
-        Duration::from_secs(2)
-    );
-    
+
+    let mut single_stream =
+        SingleQuoteStream::create(client.clone(), "TSLA".to_string(), Duration::from_secs(2));
+
     let mut count = 0;
     while let Some(result) = single_stream.next().await {
         count += 1;
         match result {
             Ok(quote) => {
-                println!("#{} {} - ${} | {} ({})", 
-                    count,
-                    quote.symbol, 
-                    quote.price, 
-                    quote.change,
-                    quote.percent_change
+                println!(
+                    "#{} {} - ${} | {} ({})",
+                    count, quote.symbol, quote.price, quote.change, quote.percent_change
                 );
             }
             Err(e) => {
                 eprintln!("Error: {}", e);
             }
         }
-        
+
         if count >= 3 {
             break;
         }
@@ -100,6 +99,6 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len-3])
+        format!("{}...", &s[..max_len - 3])
     }
 }

@@ -47,18 +47,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get industry data
     // Note: Industry keys may vary - try different keys like "semiconductors", "software-application"
     println!("\n=== Industry Data ===");
-    for industry_key in &["semiconductors", "software-application", "consumer-electronics"] {
+    for industry_key in &[
+        "semiconductors",
+        "software-application",
+        "consumer-electronics",
+    ] {
         match client.get_industry(industry_key).await {
             Ok(industry) => {
                 println!("\nIndustry: {} (key: {})", industry.name, industry_key);
                 if let Some(sector) = &industry.sector_name {
                     println!("Sector: {}", sector);
                 }
-                
+
                 if !industry.top_performing_companies.is_empty() {
                     println!("Top Performing Companies:");
                     for company in industry.top_performing_companies.iter().take(3) {
-                        let ytd = company.ytd_return.map(|r| format!("{:+.2}%", r * 100.0)).unwrap_or_default();
+                        let ytd = company
+                            .ytd_return
+                            .map(|r| format!("{:+.2}%", r * 100.0))
+                            .unwrap_or_default();
                         println!("  {} ({}) - YTD: {}", company.name, company.symbol, ytd);
                     }
                 }
@@ -67,7 +74,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(_) => continue, // Try next industry key
         }
     }
-    println!("\nNote: Some market endpoints may require different authentication or may be deprecated.");
+    println!(
+        "\nNote: Some market endpoints may require different authentication or may be deprecated."
+    );
 
     Ok(())
 }

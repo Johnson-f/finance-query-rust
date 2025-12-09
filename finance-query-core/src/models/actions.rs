@@ -86,14 +86,11 @@ impl ActionsResponse {
                 if let Some(divs) = &events.dividends {
                     for div in divs.values() {
                         actions.dividends.push(Dividend {
-                            date: Utc
-                                .timestamp_opt(div.date, 0)
-                                .single()
-                                .ok_or_else(|| {
-                                    crate::client::YahooError::ParseError(
-                                        "Invalid dividend timestamp".to_string(),
-                                    )
-                                })?,
+                            date: Utc.timestamp_opt(div.date, 0).single().ok_or_else(|| {
+                                crate::client::YahooError::ParseError(
+                                    "Invalid dividend timestamp".to_string(),
+                                )
+                            })?,
                             amount: div.amount,
                             currency: None,
                         });
@@ -104,13 +101,11 @@ impl ActionsResponse {
                 if let Some(splits) = &events.splits {
                     for split in splits.values() {
                         actions.splits.push(StockSplit::new(
-                            Utc.timestamp_opt(split.date, 0)
-                                .single()
-                                .ok_or_else(|| {
-                                    crate::client::YahooError::ParseError(
-                                        "Invalid split timestamp".to_string(),
-                                    )
-                                })?,
+                            Utc.timestamp_opt(split.date, 0).single().ok_or_else(|| {
+                                crate::client::YahooError::ParseError(
+                                    "Invalid split timestamp".to_string(),
+                                )
+                            })?,
                             split.numerator,
                             split.denominator,
                         ));
@@ -121,14 +116,11 @@ impl ActionsResponse {
                 if let Some(gains) = &events.capital_gains {
                     for gain in gains.values() {
                         actions.capital_gains.push(CapitalGain {
-                            date: Utc
-                                .timestamp_opt(gain.date, 0)
-                                .single()
-                                .ok_or_else(|| {
-                                    crate::client::YahooError::ParseError(
-                                        "Invalid capital gain timestamp".to_string(),
-                                    )
-                                })?,
+                            date: Utc.timestamp_opt(gain.date, 0).single().ok_or_else(|| {
+                                crate::client::YahooError::ParseError(
+                                    "Invalid capital gain timestamp".to_string(),
+                                )
+                            })?,
                             amount: gain.amount,
                         });
                     }

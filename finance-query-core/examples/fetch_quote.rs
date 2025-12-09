@@ -14,11 +14,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Create the fetch client (with optional proxy)
     let fetch_client = Arc::new(FetchClient::new(proxy.clone())?);
-    
+
     // 2. Create auth manager (shares the same proxy)
     let cookie_jar = fetch_client.cookie_jar().clone();
     let auth_manager = Arc::new(YahooAuthManager::new(proxy, cookie_jar));
-    
+
     // 3. Create Yahoo Finance client
     let client = YahooFinanceClient::new(auth_manager.clone(), fetch_client.clone());
 
@@ -36,17 +36,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📊 Fetching simple quotes for AAPL, GOOGL, MSFT...");
     let symbols = vec!["AAPL", "GOOGL", "MSFT"];
     let quotes = client.get_simple_quotes(&symbols).await?;
-    println!("Simple quotes response:\n{}\n", serde_json::to_string_pretty(&quotes)?);
+    println!(
+        "Simple quotes response:\n{}\n",
+        serde_json::to_string_pretty(&quotes)?
+    );
 
     // 7. Search for a symbol
     println!("🔍 Searching for 'Tesla'...");
     let search_results = client.search("Tesla", 5).await?;
-    println!("Search results:\n{}\n", serde_json::to_string_pretty(&search_results)?);
+    println!(
+        "Search results:\n{}\n",
+        serde_json::to_string_pretty(&search_results)?
+    );
 
     // 8. Get historical data
     println!("📉 Fetching 1-month historical data for AAPL...");
     let chart = client.get_chart("AAPL", "1d", "1mo").await?;
-    println!("Chart data (first 500 chars):\n{}...\n", 
+    println!(
+        "Chart data (first 500 chars):\n{}...\n",
         serde_json::to_string_pretty(&chart)?
             .chars()
             .take(500)

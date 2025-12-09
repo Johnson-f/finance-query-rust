@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(indices) => {
                 count += 1;
                 println!("=== Update #{} ===", count);
-                
+
                 for index in indices {
                     println!(
                         "{}: {:.2} ({}) {}",
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
                 println!();
-                
+
                 // Stop after 10 updates for demo purposes
                 if count >= 10 {
                     println!("Demo complete - received 10 updates");

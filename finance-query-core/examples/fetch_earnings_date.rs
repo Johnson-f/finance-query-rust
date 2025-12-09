@@ -15,13 +15,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match client.get_calendar(symbol).await {
             Ok(calendar) => {
                 println!("\n{} Calendar:", symbol);
-                
+
                 if let Some(date) = calendar.earnings_date {
                     println!("  Earnings: {}", date.format("%Y-%m-%d %H:%M UTC"));
                 } else {
                     println!("  Earnings: Not scheduled");
                 }
-                
+
                 if let Some(date) = calendar.ex_dividend_date {
                     println!("  Ex-Dividend: {}", date.format("%Y-%m-%d"));
                 }

@@ -15,16 +15,11 @@ use tracing::{debug, error, info, warn};
 const MIN_REFRESH_INTERVAL_SECS: i64 = 30;
 
 /// Auth acquisition strategy. Mirrors yfinance’s dual-path approach.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum CookieStrategy {
+    #[default]
     Basic,
     Csrf,
-}
-
-impl Default for CookieStrategy {
-    fn default() -> Self {
-        CookieStrategy::Basic
-    }
 }
 
 static CSRF_TOKEN_RE: Lazy<Regex> =
@@ -85,9 +80,7 @@ impl YahooAuthManager {
                 &proxy_url.chars().take(30).collect::<String>()
             );
             builder = builder
-                .proxy(
-                    reqwest::Proxy::all(proxy_url).map_err(YahooError::NetworkError)?,
-                )
+                .proxy(reqwest::Proxy::all(proxy_url).map_err(YahooError::NetworkError)?)
                 // Accept proxy's SSL certificate (Bright Data and similar proxies use self-signed certs)
                 .danger_accept_invalid_certs(true);
         }

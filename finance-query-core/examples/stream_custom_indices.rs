@@ -8,15 +8,15 @@ use std::time::Duration;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get index symbols from command line arguments or use defaults
     let args: Vec<String> = env::args().collect();
-    
+
     let index_symbols = if args.len() > 1 {
         args[1..].to_vec()
     } else {
         // Default to major US indices
         vec![
-            "^GSPC".to_string(),  // S&P 500
-            "^DJI".to_string(),   // Dow Jones
-            "^IXIC".to_string(),  // NASDAQ
+            "^GSPC".to_string(), // S&P 500
+            "^DJI".to_string(),  // Dow Jones
+            "^IXIC".to_string(), // NASDAQ
         ]
     };
 
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Press Ctrl+C to stop\n");
 
     // Create custom index stream
-    let mut stream = IndexStream::new(client.clone(), index_symbols, Duration::from_secs(5));
+    let mut stream = IndexStream::create(client.clone(), index_symbols, Duration::from_secs(5));
 
     // Stream updates
     let mut count = 0;
@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 count += 1;
                 let timestamp = chrono::Utc::now().format("%H:%M:%S");
                 println!("=== Update #{} at {} UTC ===", count, timestamp);
-                
+
                 for index in indices {
                     // Color code based on change
                     let indicator = if index.change.starts_with('+') {
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         "➡️"
                     };
-                    
+
                     println!(
                         "{} {}: {:.2} ({}) {}",
                         indicator, index.name, index.value, index.change, index.percent_change

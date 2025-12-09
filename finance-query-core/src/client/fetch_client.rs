@@ -34,7 +34,9 @@ impl FetchClient {
     /// * `AUTH_PROXY_URL` - If set, used for authentication requests instead of the general proxy
     pub fn new(proxy: Option<String>) -> Result<Self, YahooError> {
         // Check for auth-only proxy first, fall back to general proxy
-        let auth_proxy = std::env::var("AUTH_PROXY_URL").ok().or_else(|| proxy.clone());
+        let auth_proxy = std::env::var("AUTH_PROXY_URL")
+            .ok()
+            .or_else(|| proxy.clone());
 
         let cookie_jar = Arc::new(Jar::default());
 
@@ -46,9 +48,8 @@ impl FetchClient {
 
         // Only use proxy for general client if PROXY_URL is set (not AUTH_PROXY_URL)
         if let Some(proxy_url) = &proxy {
-            builder = builder.proxy(
-                reqwest::Proxy::all(proxy_url).map_err(YahooError::NetworkError)?,
-            );
+            builder =
+                builder.proxy(reqwest::Proxy::all(proxy_url).map_err(YahooError::NetworkError)?);
         }
 
         let client = builder.build().map_err(YahooError::NetworkError)?;
@@ -60,7 +61,6 @@ impl FetchClient {
             auth_proxy,
         })
     }
-
 
     /// Get the proxy URL to use for auth requests only.
     pub fn auth_proxy(&self) -> Option<&String> {
@@ -184,9 +184,12 @@ impl FetchClient {
         Ok(text)
     }
 
-
     /// Fetch a URL with a custom timeout.
-    pub async fn fetch_with_timeout(&self, url: &str, timeout: Duration) -> Result<String, YahooError> {
+    pub async fn fetch_with_timeout(
+        &self,
+        url: &str,
+        timeout: Duration,
+    ) -> Result<String, YahooError> {
         // Create a request builder with timeout override
         // Use tokio::time::timeout to ensure the request doesn't exceed the specified timeout
         let response = match tokio::time::timeout(

@@ -57,7 +57,6 @@ impl Sector {
         }
     }
 
-
     #[allow(dead_code)]
     pub fn all() -> Vec<Sector> {
         vec![

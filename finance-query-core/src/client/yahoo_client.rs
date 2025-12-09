@@ -69,7 +69,6 @@ impl YahooFinanceClient {
         }
     }
 
-
     async fn yahoo_request_inner(
         &self,
         url: &str,
@@ -180,12 +179,7 @@ impl YahooFinanceClient {
         Ok(response)
     }
 
-
-    async fn json(
-        &self,
-        url: &str,
-        params: Option<&[(&str, &str)]>,
-    ) -> Result<Value, YahooError> {
+    async fn json(&self, url: &str, params: Option<&[(&str, &str)]>) -> Result<Value, YahooError> {
         debug!("Making JSON request to: {}", url);
         if let Some(params) = params {
             debug!("Request params: {:?}", params);
@@ -288,7 +282,11 @@ impl YahooFinanceClient {
     }
 
     /// Get similar/recommended quotes for a symbol.
-    pub async fn get_similar_quotes(&self, symbol: &str, limit: usize) -> Result<Value, YahooError> {
+    pub async fn get_similar_quotes(
+        &self,
+        symbol: &str,
+        limit: usize,
+    ) -> Result<Value, YahooError> {
         let url = format!(
             "https://query2.finance.yahoo.com/v6/finance/recommendationsbysymbol/{}",
             symbol
@@ -297,7 +295,6 @@ impl YahooFinanceClient {
         let params = [("count", count_str.as_str())];
         self.json(&url, Some(&params)).await
     }
-
 
     /// Get fundamentals timeseries data.
     pub async fn get_fundamentals_timeseries(
@@ -531,10 +528,7 @@ impl YahooFinanceClient {
     ///     println!("Next earnings: {}", date);
     /// }
     /// ```
-    pub async fn get_calendar(
-        &self,
-        symbol: &str,
-    ) -> Result<crate::models::Calendar, YahooError> {
+    pub async fn get_calendar(&self, symbol: &str) -> Result<crate::models::Calendar, YahooError> {
         use crate::models::calendar::{Calendar, YahooCalendarResponse};
 
         let url = format!(
@@ -623,9 +617,8 @@ impl YahooFinanceClient {
         let response = self.yahoo_request(&url, Some(&params)).await?;
         let text = response.text().await.map_err(YahooError::NetworkError)?;
 
-        let yahoo_response: YahooEsgResponse = serde_json::from_str(&text).map_err(|e| {
-            YahooError::ParseError(format!("Failed to parse ESG response: {}", e))
-        })?;
+        let yahoo_response: YahooEsgResponse = serde_json::from_str(&text)
+            .map_err(|e| YahooError::ParseError(format!("Failed to parse ESG response: {}", e)))?;
 
         SustainabilityScores::from_yahoo_response(symbol.to_string(), yahoo_response)
     }
@@ -717,7 +710,10 @@ impl YahooFinanceClient {
         let url = "https://query1.finance.yahoo.com/v6/finance/quote/marketSummary";
 
         let params = [
-            ("fields", "shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent"),
+            (
+                "fields",
+                "shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent",
+            ),
             ("formatted", "false"),
             ("lang", "en-US"),
             ("market", market),
@@ -726,9 +722,10 @@ impl YahooFinanceClient {
         let response = self.yahoo_request(url, Some(&params)).await?;
         let text = response.text().await.map_err(YahooError::NetworkError)?;
 
-        let yahoo_response: YahooMarketSummaryResponse = serde_json::from_str(&text).map_err(|e| {
-            YahooError::ParseError(format!("Failed to parse market summary response: {}", e))
-        })?;
+        let yahoo_response: YahooMarketSummaryResponse =
+            serde_json::from_str(&text).map_err(|e| {
+                YahooError::ParseError(format!("Failed to parse market summary response: {}", e))
+            })?;
 
         // Optionally get market status
         let status = self.get_market_status(market).await.ok();
@@ -744,16 +741,23 @@ impl YahooFinanceClient {
     /// # Example
     /// ```rust,ignore
     /// use finance_query_core::MoverCount;
-    /// 
+    ///
     /// let (actives, gainers, losers) = client.get_movers(MoverCount::Fifty).await?;
     /// println!("Top gainer: {} ({:+})", gainers[0].name, gainers[0].percent_change);
     /// ```
     pub async fn get_movers(
         &self,
         count: crate::models::MoverCount,
-    ) -> Result<(Vec<crate::models::MarketMover>, Vec<crate::models::MarketMover>, Vec<crate::models::MarketMover>), YahooError> {
+    ) -> Result<
+        (
+            Vec<crate::models::MarketMover>,
+            Vec<crate::models::MarketMover>,
+            Vec<crate::models::MarketMover>,
+        ),
+        YahooError,
+    > {
         let count_str = count.as_str();
-        
+
         // Fetch screener data for each category
         let actives_url = format!(
             "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count={}&scrIds=most_actives",
@@ -807,9 +811,9 @@ impl YahooFinanceClient {
                     .to_string();
 
                 // Filter for US stocks only (no dots or with US exchange suffixes)
-                if !symbol.is_empty() && !symbol.contains('.') 
-                    || symbol.ends_with(".OB") 
-                    || symbol.ends_with(".PK") 
+                if !symbol.is_empty() && !symbol.contains('.')
+                    || symbol.ends_with(".OB")
+                    || symbol.ends_with(".PK")
                 {
                     let name = quote
                         .get("longName")

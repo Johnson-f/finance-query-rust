@@ -1,73 +1,71 @@
-pub mod quote;
-pub mod historical;
-pub mod news;
-pub mod search;
-pub mod financials;
-pub mod movers;
-pub mod indices;
-pub mod holders;
-pub mod analysts;
-pub mod sectors;
-pub mod earnings_transcripts;
 pub mod actions;
-pub mod options;
+pub mod analysts;
 pub mod calendar;
-pub mod sec_filings;
-pub mod sustainability;
+pub mod earnings_transcripts;
+pub mod financials;
+pub mod historical;
+pub mod holders;
+pub mod indices;
 pub mod industry;
 pub mod market;
+pub mod movers;
+pub mod news;
+pub mod options;
+pub mod quote;
+pub mod search;
+pub mod sec_filings;
+pub mod sectors;
+pub mod sustainability;
 
 // Quote models
-pub use quote::{Quote, SimpleQuote, DetailedQuote};
+pub use quote::{DetailedQuote, Quote, SimpleQuote};
 
 // Historical models
-pub use historical::{HistoricalData, HistoricalResponse, TimeRange, Interval, IndicatorType};
+pub use historical::{HistoricalData, HistoricalResponse, IndicatorType, Interval, TimeRange};
 
 // News models
 pub use news::News;
 
 // Search models
-pub use search::{SearchResult, SearchResponse};
+pub use search::{SearchResponse, SearchResult};
 
 // Financial models
-pub use financials::{FinancialStatement, StatementType, Frequency};
+pub use financials::{FinancialStatement, Frequency, StatementType};
 
 // Movers models
-pub use movers::{MoverCount, MarketMover};
+pub use movers::{MarketMover, MoverCount};
 
 // Indices models
-pub use indices::{Region, Index, MarketIndex, get_index_regions};
+pub use indices::{get_index_regions, Index, MarketIndex, Region};
 
 // Holders models
 pub use holders::{
-    HolderType, MajorHoldersBreakdown, InstitutionalHolder, MutualFundHolder,
-    InsiderTransaction, InsiderPurchase, InsiderRosterMember,
-    MajorHoldersResponse, InstitutionalHoldersResponse, MutualFundHoldersResponse,
-    InsiderTransactionsResponse, InsiderPurchasesResponse, InsiderRosterResponse,
-    HoldersData,
+    HolderType, HoldersData, InsiderPurchase, InsiderPurchasesResponse, InsiderRosterMember,
+    InsiderRosterResponse, InsiderTransaction, InsiderTransactionsResponse, InstitutionalHolder,
+    InstitutionalHoldersResponse, MajorHoldersBreakdown, MajorHoldersResponse, MutualFundHolder,
+    MutualFundHoldersResponse,
 };
 
 // Analysts models
 pub use analysts::{
-    AnalysisType, RecommendationData, UpgradeDowngrade, PriceTarget,
-    EarningsEstimate, RevenueEstimate, EarningsHistoryItem,
-    RecommendationsResponse, UpgradesDowngradesResponse, PriceTargetsResponse,
-    EarningsEstimateResponse, RevenueEstimateResponse, EarningsHistoryResponse,
-    EpsTrend, EpsRevisions, GrowthEstimate,
-    EpsTrendResponse, EpsRevisionsResponse, GrowthEstimatesResponse,
+    AnalysisType, EarningsEstimate, EarningsEstimateResponse, EarningsHistoryItem,
+    EarningsHistoryResponse, EpsRevisions, EpsRevisionsResponse, EpsTrend, EpsTrendResponse,
+    GrowthEstimate, GrowthEstimatesResponse, PriceTarget, PriceTargetsResponse, RecommendationData,
+    RecommendationsResponse, RevenueEstimate, RevenueEstimateResponse, UpgradeDowngrade,
+    UpgradesDowngradesResponse,
 };
 
 // Sectors models
-pub use sectors::{Sector, MarketSector, MarketSectorDetails};
+pub use sectors::{MarketSector, MarketSectorDetails, Sector};
 
 // Earnings transcripts models
 pub use earnings_transcripts::{
-    Quarter, EarningsCallListing, EarningsCallsList, TranscriptSpeaker,
-    TranscriptParagraph, EarningsTranscript,
+    EarningsCallListing, EarningsCallsList, EarningsTranscript, Quarter, TranscriptParagraph,
+    TranscriptSpeaker,
 };
 
 // Actions models
-pub use actions::{ActionsResponse, Dividend, StockSplit, CapitalGain};
+pub use actions::{ActionsResponse, CapitalGain, Dividend, StockSplit};
 
 // Options models
 pub use options::{OptionChain, OptionContract, OptionExpirations};
@@ -76,7 +74,7 @@ pub use options::{OptionChain, OptionContract, OptionExpirations};
 pub use calendar::Calendar;
 
 // SEC filings models
-pub use sec_filings::{SecFiling, SecFilingsResponse, SecExhibit};
+pub use sec_filings::{SecExhibit, SecFiling, SecFilingsResponse};
 
 // Sustainability/ESG models
 pub use sustainability::SustainabilityScores;

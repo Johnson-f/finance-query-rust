@@ -51,7 +51,6 @@ pub struct MajorHoldersBreakdown {
     pub breakdown_data: HashMap<String, serde_json::Value>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstitutionalHolder {
     pub holder: String,
@@ -96,7 +95,10 @@ pub struct InsiderPurchase {
     pub period: String,
     #[serde(skip_serializing_if = "Option::is_none", rename = "purchasesShares")]
     pub purchases_shares: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "purchasesTransactions")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "purchasesTransactions"
+    )]
     pub purchases_transactions: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "salesShares")]
     pub sales_shares: Option<i64>,
@@ -108,11 +110,20 @@ pub struct InsiderPurchase {
     pub net_transactions: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "totalInsiderShares")]
     pub total_insider_shares: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "netPercentInsiderShares")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "netPercentInsiderShares"
+    )]
     pub net_percent_insider_shares: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "buyPercentInsiderShares")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "buyPercentInsiderShares"
+    )]
     pub buy_percent_insider_shares: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "sellPercentInsiderShares")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "sellPercentInsiderShares"
+    )]
     pub sell_percent_insider_shares: Option<f64>,
 }
 
@@ -120,13 +131,25 @@ pub struct InsiderPurchase {
 pub struct InsiderRosterMember {
     pub name: String,
     pub position: String,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "mostRecentTransaction")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "mostRecentTransaction"
+    )]
     pub most_recent_transaction: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "latestTransactionDate")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "latestTransactionDate"
+    )]
     pub latest_transaction_date: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "sharesOwnedDirectly")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "sharesOwnedDirectly"
+    )]
     pub shares_owned_directly: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "sharesOwnedIndirectly")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "sharesOwnedIndirectly"
+    )]
     pub shares_owned_indirectly: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "positionDirectDate")]
     pub position_direct_date: Option<DateTime<Utc>>,
