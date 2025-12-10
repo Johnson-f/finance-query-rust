@@ -48,10 +48,12 @@ impl ResponseError for WebError {
                     "message": self.0.to_string()
                 }))
             }
-            YahooError::ParseError(_) => HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Parse error",
-                "message": self.0.to_string()
-            })),
+            YahooError::ParseError(_) => {
+                HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Parse error",
+                    "message": self.0.to_string()
+                }))
+            }
             YahooError::NetworkError(_) => HttpResponse::BadGateway().json(serde_json::json!({
                 "error": "Network error",
                 "message": self.0.to_string()

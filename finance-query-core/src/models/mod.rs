@@ -7,6 +7,7 @@ pub mod historical;
 pub mod holders;
 pub mod indices;
 pub mod industry;
+pub mod logo;
 pub mod market;
 pub mod movers;
 pub mod news;
@@ -18,6 +19,7 @@ pub mod sectors;
 pub mod sustainability;
 
 // Quote models
+pub use logo::LogoFetcher;
 pub use quote::{DetailedQuote, Quote, SimpleQuote};
 
 // Historical models

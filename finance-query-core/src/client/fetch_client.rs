@@ -15,6 +15,7 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 ///
 /// Provides cookie management, proxy support, and various fetch methods
 /// for different content types (HTML, JSON).
+#[derive(Debug)]
 pub struct FetchClient {
     client: Client,
     cookie_jar: Arc<Jar>,

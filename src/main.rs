@@ -6,7 +6,7 @@ mod service;
 mod utils;
 
 use actix_cors::Cors;
-use actix_web::{web, App, HttpServer};
+use actix_web::{App, HttpServer, web};
 use async_graphql::{EmptyMutation, Schema};
 use finance_query_core::{FetchClient, YahooAuthManager, YahooFinanceClient};
 use graphql::{AppContext, Query, Subscription};
@@ -30,7 +30,7 @@ pub struct AppState {
 async fn main() -> std::io::Result<()> {
     // Load environment variables from .env file if it exists
     dotenv::dotenv().ok();
-    
+
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
@@ -42,10 +42,8 @@ async fn main() -> std::io::Result<()> {
     let proxy = std::env::var("PROXY_URL").ok();
 
     // Initialize fetch client
-    let fetch_client = Arc::new(
-        FetchClient::new(proxy.clone())
-            .expect("Failed to create fetch client"),
-    );
+    let fetch_client =
+        Arc::new(FetchClient::new(proxy.clone()).expect("Failed to create fetch client"));
 
     // Initialize Yahoo auth manager with auth proxy (or general proxy as fallback)
     // This allows using a residential proxy only for auth while data goes direct
@@ -80,10 +78,9 @@ async fn main() -> std::io::Result<()> {
         .and_then(|v| v.parse::<u64>().ok());
 
     // Initialize rate limit manager
-    let rate_limit_manager = Arc::new(
-        RateLimitManager::new(redis_url.clone(), rate_limit_per_day).await
-    );
-    
+    let rate_limit_manager =
+        Arc::new(RateLimitManager::new(redis_url.clone(), rate_limit_per_day).await);
+
     info!(
         "Rate limiting configured: {} requests per day per IP",
         rate_limit_manager.limit_per_day()
@@ -125,10 +122,21 @@ async fn main() -> std::io::Result<()> {
             .app_data(schema_data.clone())
             .wrap(cors)
             .wrap(TracingLogger::default())
-            .wrap(middleware::rate_limit::RateLimitMiddleware::new(rate_limit_manager.clone()))
-            .route("/graphql", web::post().to(graphql::handlers::graphql_handler))
-            .route("/graphql", web::get().to(graphql::handlers::graphql_ws_handler))
-            .route("/graphql-playground", web::get().to(graphql::handlers::graphql_playground))
+            .wrap(middleware::rate_limit::RateLimitMiddleware::new(
+                rate_limit_manager.clone(),
+            ))
+            .route(
+                "/graphql",
+                web::post().to(graphql::handlers::graphql_handler),
+            )
+            .route(
+                "/graphql",
+                web::get().to(graphql::handlers::graphql_ws_handler),
+            )
+            .route(
+                "/graphql-playground",
+                web::get().to(graphql::handlers::graphql_playground),
+            )
             .configure(routes::configure_routes)
     })
     .bind("0.0.0.0:8080")?

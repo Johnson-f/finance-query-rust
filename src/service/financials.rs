@@ -1,7 +1,7 @@
+use crate::utils::financials_constants::get_statement_fields;
 use finance_query_core::client::YahooFinanceClient;
 use finance_query_core::client::error::YahooError;
-use finance_query_core::models::{FinancialStatement, StatementType, Frequency};
-use crate::utils::financials_constants::get_statement_fields;
+use finance_query_core::models::{FinancialStatement, Frequency, StatementType};
 use serde_json::Value;
 use std::collections::HashMap;
 use tracing::debug;
@@ -16,7 +16,7 @@ fn map_statement_type_to_key(statement_type: StatementType) -> &'static str {
 }
 
 /// Parse Yahoo Finance timeseries response into financial statement format.
-/// 
+///
 /// Transforms the API response into a format where each metric is a key,
 /// and the value is a dictionary of date->value mappings.
 fn parse_timeseries_data(timeseries_result: &[Value]) -> HashMap<String, HashMap<String, Value>> {
@@ -47,7 +47,7 @@ fn parse_timeseries_data(timeseries_result: &[Value]) -> HashMap<String, HashMap
 
         // Extract timestamp data using the original name with prefix
         let mut timestamp_data: HashMap<String, Value> = HashMap::new();
-        
+
         if let Some(datapoints) = item.get(metric_name_with_prefix).and_then(|v| v.as_array()) {
             for datapoint in datapoints {
                 // Skip null entries
@@ -115,7 +115,7 @@ pub async fn get_financial_statement(
     // Get appropriate fields for statement type
     let statement_key = map_statement_type_to_key(statement_type);
     let fields = get_statement_fields(statement_key, frequency.as_str());
-    
+
     // Convert to slice of string references for the API call
     let field_refs: Vec<&str> = fields.iter().map(|s| s.as_str()).collect();
 
@@ -123,8 +123,13 @@ pub async fn get_financial_statement(
     let period2 = chrono::Utc::now().timestamp();
     let period1 = period2 - (10 * 365 * 24 * 60 * 60); // 10 years ago
 
-    debug!("Fetching financial statement for {}: type={}, frequency={}, fields={}", 
-           symbol, statement_key, frequency.as_str(), fields.len());
+    debug!(
+        "Fetching financial statement for {}: type={}, frequency={}, fields={}",
+        symbol,
+        statement_key,
+        frequency.as_str(),
+        fields.len()
+    );
 
     // Fetch data from Yahoo Finance
     let response = yahoo_client
@@ -160,8 +165,12 @@ pub async fn get_financial_statement(
         )));
     }
 
-    debug!("Successfully parsed {} metrics for {} {} statement", 
-           parsed_statement.len(), symbol, statement_key);
+    debug!(
+        "Successfully parsed {} metrics for {} {} statement",
+        parsed_statement.len(),
+        symbol,
+        statement_key
+    );
 
     Ok(FinancialStatement {
         symbol: symbol.to_uppercase(),

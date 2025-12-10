@@ -1,9 +1,9 @@
-use finance_query_core::client::{error::YahooError, YahooFinanceClient};
+use chrono::{DateTime, Utc};
+use finance_query_core::client::{YahooFinanceClient, error::YahooError};
 use finance_query_core::models::holders::{
-    HoldersData, HolderType, InsiderPurchase, InsiderRosterMember, InsiderTransaction,
+    HolderType, HoldersData, InsiderPurchase, InsiderRosterMember, InsiderTransaction,
     InstitutionalHolder, MajorHoldersBreakdown, MutualFundHolder,
 };
-use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::collections::HashMap;
 use tracing::info;
@@ -26,16 +26,20 @@ pub async fn get_holders_data(
     symbol: &str,
     holder_type: HolderType,
 ) -> Result<HoldersData, YahooError> {
-    info!("Fetching {} holders data for {}", holder_type.as_str(), symbol);
-    
+    info!(
+        "Fetching {} holders data for {}",
+        holder_type.as_str(),
+        symbol
+    );
+
     let modules = get_modules_for_holder_type(holder_type);
     let modules_refs: Vec<&str> = modules.to_vec();
-    
+
     // Fetch data from Yahoo Finance
     let response = yahoo_client
         .get_quote_summary(&symbol.to_uppercase(), &modules_refs)
         .await?;
-    
+
     // Extract the result
     let result = response
         .get("quoteSummary")
@@ -49,7 +53,7 @@ pub async fn get_holders_data(
                 symbol
             ))
         })?;
-    
+
     // Parse based on holder type
     let holders_data = match holder_type {
         HolderType::Major => {
@@ -131,8 +135,12 @@ pub async fn get_holders_data(
             }
         }
     };
-    
-    info!("Successfully parsed {} holders data for {}", holder_type.as_str(), symbol);
+
+    info!(
+        "Successfully parsed {} holders data for {}",
+        holder_type.as_str(),
+        symbol
+    );
     Ok(holders_data)
 }
 
@@ -140,33 +148,39 @@ fn parse_major_breakdown(data: &Value) -> Result<MajorHoldersBreakdown, YahooErr
     let breakdown_data_obj = data
         .get("majorHoldersBreakdown")
         .ok_or_else(|| YahooError::ParseError("No majorHoldersBreakdown data found".to_string()))?;
-    
+
     let mut breakdown_data = HashMap::new();
-    
+
     if let Some(val) = breakdown_data_obj.get("insidersPercentHeld")
         && let Some(raw) = val.as_f64()
     {
-            breakdown_data.insert("insidersPercentHeld".to_string(), serde_json::json!(raw));
+        breakdown_data.insert("insidersPercentHeld".to_string(), serde_json::json!(raw));
     }
-    
+
     if let Some(val) = breakdown_data_obj.get("institutionsPercentHeld")
         && let Some(raw) = val.as_f64()
     {
-            breakdown_data.insert("institutionsPercentHeld".to_string(), serde_json::json!(raw));
+        breakdown_data.insert(
+            "institutionsPercentHeld".to_string(),
+            serde_json::json!(raw),
+        );
     }
-    
+
     if let Some(val) = breakdown_data_obj.get("institutionsFloatPercentHeld")
         && let Some(raw) = val.as_f64()
     {
-            breakdown_data.insert("institutionsFloatPercentHeld".to_string(), serde_json::json!(raw));
+        breakdown_data.insert(
+            "institutionsFloatPercentHeld".to_string(),
+            serde_json::json!(raw),
+        );
     }
-    
+
     if let Some(val) = breakdown_data_obj.get("institutionsCount")
         && let Some(raw) = val.as_i64()
     {
-            breakdown_data.insert("institutionsCount".to_string(), serde_json::json!(raw));
+        breakdown_data.insert("institutionsCount".to_string(), serde_json::json!(raw));
     }
-    
+
     Ok(MajorHoldersBreakdown { breakdown_data })
 }
 
@@ -177,9 +191,9 @@ fn parse_institutional_holders(data: &Value) -> Result<Vec<InstitutionalHolder>,
         .and_then(|io| io.get("ownershipList"))
         .and_then(|ol| ol.as_array())
         .unwrap_or(&empty_vec);
-    
+
     let mut holders = Vec::new();
-    
+
     for holder_data in holders_list {
         let date_reported = holder_data
             .get("reportDate")
@@ -187,7 +201,7 @@ fn parse_institutional_holders(data: &Value) -> Result<Vec<InstitutionalHolder>,
             .and_then(|r| r.as_i64())
             .map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now))
             .unwrap_or_else(Utc::now);
-        
+
         let holder = InstitutionalHolder {
             holder: holder_data
                 .get("organization")
@@ -209,10 +223,10 @@ fn parse_institutional_holders(data: &Value) -> Result<Vec<InstitutionalHolder>,
                 .and_then(|v| v.get("raw"))
                 .and_then(|r| r.as_i64()),
         };
-        
+
         holders.push(holder);
     }
-    
+
     Ok(holders)
 }
 
@@ -223,9 +237,9 @@ fn parse_mutualfund_holders(data: &Value) -> Result<Vec<MutualFundHolder>, Yahoo
         .and_then(|fo| fo.get("ownershipList"))
         .and_then(|ol| ol.as_array())
         .unwrap_or(&empty_vec);
-    
+
     let mut holders = Vec::new();
-    
+
     for holder_data in holders_list {
         let date_reported = holder_data
             .get("reportDate")
@@ -233,7 +247,7 @@ fn parse_mutualfund_holders(data: &Value) -> Result<Vec<MutualFundHolder>, Yahoo
             .and_then(|r| r.as_i64())
             .map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now))
             .unwrap_or_else(Utc::now);
-        
+
         let holder = MutualFundHolder {
             holder: holder_data
                 .get("organization")
@@ -255,10 +269,10 @@ fn parse_mutualfund_holders(data: &Value) -> Result<Vec<MutualFundHolder>, Yahoo
                 .and_then(|v| v.get("raw"))
                 .and_then(|r| r.as_i64()),
         };
-        
+
         holders.push(holder);
     }
-    
+
     Ok(holders)
 }
 
@@ -269,9 +283,9 @@ fn parse_insider_transactions(data: &Value) -> Result<Vec<InsiderTransaction>, Y
         .and_then(|it| it.get("transactions"))
         .and_then(|t| t.as_array())
         .unwrap_or(&empty_vec);
-    
+
     let mut transactions = Vec::new();
-    
+
     for trans_data in transactions_list {
         let start_date = trans_data
             .get("startDate")
@@ -279,7 +293,7 @@ fn parse_insider_transactions(data: &Value) -> Result<Vec<InsiderTransaction>, Y
             .and_then(|r| r.as_i64())
             .map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now))
             .unwrap_or_else(Utc::now);
-        
+
         let transaction = InsiderTransaction {
             start_date,
             insider: trans_data
@@ -310,18 +324,18 @@ fn parse_insider_transactions(data: &Value) -> Result<Vec<InsiderTransaction>, Y
                 .and_then(|o| o.as_str())
                 .map(|s| s.to_string()),
         };
-        
+
         transactions.push(transaction);
     }
-    
+
     Ok(transactions)
 }
 
 fn parse_insider_purchases(data: &Value) -> Result<InsiderPurchase, YahooError> {
-    let purchase_data = data
-        .get("netSharePurchaseActivity")
-        .ok_or_else(|| YahooError::ParseError("No netSharePurchaseActivity data found".to_string()))?;
-    
+    let purchase_data = data.get("netSharePurchaseActivity").ok_or_else(|| {
+        YahooError::ParseError("No netSharePurchaseActivity data found".to_string())
+    })?;
+
     Ok(InsiderPurchase {
         period: purchase_data
             .get("period")
@@ -378,22 +392,22 @@ fn parse_insider_roster(data: &Value) -> Result<Vec<InsiderRosterMember>, YahooE
         .and_then(|ih| ih.get("holders"))
         .and_then(|h| h.as_array())
         .unwrap_or(&empty_vec);
-    
+
     let mut roster = Vec::new();
-    
+
     for holder_data in holders_list {
         let latest_trans_date = holder_data
             .get("latestTransDate")
             .and_then(|ltd| ltd.get("raw"))
             .and_then(|r| r.as_i64())
             .and_then(|ts| DateTime::from_timestamp(ts, 0));
-        
+
         let position_direct_date = holder_data
             .get("positionDirectDate")
             .and_then(|pdd| pdd.get("raw"))
             .and_then(|r| r.as_i64())
             .and_then(|ts| DateTime::from_timestamp(ts, 0));
-        
+
         let member = InsiderRosterMember {
             name: holder_data
                 .get("name")
@@ -420,9 +434,9 @@ fn parse_insider_roster(data: &Value) -> Result<Vec<InsiderRosterMember>, YahooE
                 .and_then(|r| r.as_i64()),
             position_direct_date,
         };
-        
+
         roster.push(member);
     }
-    
+
     Ok(roster)
 }

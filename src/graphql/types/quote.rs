@@ -1,5 +1,7 @@
 use async_graphql::*;
-use finance_query_core::models::quote::{Quote as QuoteModel, SimpleQuote as SimpleQuoteModel, DetailedQuote as DetailedQuoteModel};
+use finance_query_core::models::quote::{
+    DetailedQuote as DetailedQuoteModel, Quote as QuoteModel, SimpleQuote as SimpleQuoteModel,
+};
 
 #[derive(SimpleObject, Clone)]
 pub struct Quote {

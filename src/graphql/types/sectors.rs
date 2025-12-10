@@ -1,5 +1,7 @@
 use async_graphql::*;
-use finance_query_core::models::sectors::{MarketSector as MarketSectorModel, MarketSectorDetails as MarketSectorDetailsModel};
+use finance_query_core::models::sectors::{
+    MarketSector as MarketSectorModel, MarketSectorDetails as MarketSectorDetailsModel,
+};
 
 #[derive(SimpleObject, Clone)]
 pub struct MarketSector {

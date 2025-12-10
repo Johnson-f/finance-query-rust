@@ -43,7 +43,7 @@ pub use websocket::{MarketHours, MoversUpdate, MovingAverageUpdate, ProfileUpdat
 pub use streaming::{IndexStream, MoversStream, QuoteStream, SingleQuoteStream};
 
 // Re-export quote models
-pub use models::{DetailedQuote, Quote, SimpleQuote};
+pub use models::{DetailedQuote, LogoFetcher, Quote, SimpleQuote};
 
 // Re-export historical models
 pub use models::{HistoricalData, HistoricalResponse, IndicatorType, Interval, TimeRange};

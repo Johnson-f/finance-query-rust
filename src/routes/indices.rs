@@ -1,7 +1,7 @@
-use actix_web::{web, HttpResponse, Result};
-use finance_query_core::models::indices::{Index, Region};
 use crate::error::IntoWebResult;
 use crate::service::indices;
+use actix_web::{HttpResponse, Result, web};
+use finance_query_core::models::indices::{Index, Region};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -50,10 +50,10 @@ pub async fn get_indices_handler(
     } else {
         None
     };
-    
+
     // Parse region from query parameter
     let region: Option<Region> = query.region.as_ref().and_then(|r| parse_region(r));
-    
+
     let indices_list = indices::get_indices(
         &app_state.yahoo_client,
         &app_state.fetch_client,

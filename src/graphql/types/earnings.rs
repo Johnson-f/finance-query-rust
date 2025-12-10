@@ -1,13 +1,11 @@
 use async_graphql::*;
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use finance_query_core::models::earnings_transcripts::{
-    EarningsCallListing as EarningsCallListingModel,
-    EarningsCallsList as EarningsCallsListModel,
+    EarningsCallListing as EarningsCallListingModel, EarningsCallsList as EarningsCallsListModel,
+    EarningsTranscript as EarningsTranscriptModel, TranscriptParagraph as TranscriptParagraphModel,
     TranscriptSpeaker as TranscriptSpeakerModel,
-    TranscriptParagraph as TranscriptParagraphModel,
-    EarningsTranscript as EarningsTranscriptModel,
 };
+use std::collections::HashMap;
 
 #[derive(SimpleObject, Clone)]
 pub struct EarningsCallListing {
@@ -41,7 +39,11 @@ impl From<EarningsCallsListModel> for EarningsCallsList {
     fn from(list: EarningsCallsListModel) -> Self {
         EarningsCallsList {
             symbol: list.symbol,
-            earnings_calls: list.earnings_calls.into_iter().map(EarningsCallListing::from).collect(),
+            earnings_calls: list
+                .earnings_calls
+                .into_iter()
+                .map(EarningsCallListing::from)
+                .collect(),
             total: list.total,
         }
     }
@@ -99,9 +101,19 @@ impl From<EarningsTranscriptModel> for EarningsTranscript {
             year: transcript.year,
             date: transcript.date,
             title: transcript.title,
-            speakers: transcript.speakers.into_iter().map(TranscriptSpeaker::from).collect(),
-            paragraphs: transcript.paragraphs.into_iter().map(TranscriptParagraph::from).collect(),
-            metadata: transcript.metadata.into_iter()
+            speakers: transcript
+                .speakers
+                .into_iter()
+                .map(TranscriptSpeaker::from)
+                .collect(),
+            paragraphs: transcript
+                .paragraphs
+                .into_iter()
+                .map(TranscriptParagraph::from)
+                .collect(),
+            metadata: transcript
+                .metadata
+                .into_iter()
                 .map(|(k, v)| (k, async_graphql::Json(v)))
                 .collect(),
         }

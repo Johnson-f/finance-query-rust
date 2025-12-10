@@ -1,7 +1,7 @@
-use actix_web::{web, HttpResponse, Result};
 use crate::error::IntoWebResult;
 use crate::service;
-use crate::service::caching::{news_key, TTL_NEWS};
+use crate::service::caching::{TTL_NEWS, news_key};
+use actix_web::{HttpResponse, Result, web};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -15,32 +15,31 @@ pub async fn get_news_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let cache_key = news_key(query.symbol.as_deref());
-    
+
     // Check cache first
     if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
         return Ok(HttpResponse::Ok().json(cached));
     }
-    
+
     // Cache miss - fetch from API
     let news = if let Some(symbol) = &query.symbol {
-        service::scrape_news_for_quote(
-            &app_state.fetch_client,
-            symbol,
-        )
-        .await
-        .into_web_result()?
+        service::scrape_news_for_quote(&app_state.fetch_client, symbol)
+            .await
+            .into_web_result()?
     } else {
-        service::scrape_general_news(
-            &app_state.fetch_client,
-        )
-        .await
-        .into_web_result()?
+        service::scrape_general_news(&app_state.fetch_client)
+            .await
+            .into_web_result()?
     };
 
     // Cache the result
-    let news_json: Value = serde_json::to_value(&news)
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
-    app_state.cache_service.set(&cache_key, &news_json, TTL_NEWS).await;
+    let news_json: Value = serde_json::to_value(&news).map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e))
+    })?;
+    app_state
+        .cache_service
+        .set(&cache_key, &news_json, TTL_NEWS)
+        .await;
 
     Ok(HttpResponse::Ok().json(news))
 }
@@ -52,24 +51,25 @@ pub async fn get_news_by_symbol_handler(
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
     let cache_key = news_key(Some(&symbol));
-    
+
     // Check cache first
     if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
         return Ok(HttpResponse::Ok().json(cached));
     }
-    
+
     // Cache miss - fetch from API
-    let news = service::scrape_news_for_quote(
-        &app_state.fetch_client,
-        &symbol,
-    )
-    .await
-    .into_web_result()?;
+    let news = service::scrape_news_for_quote(&app_state.fetch_client, &symbol)
+        .await
+        .into_web_result()?;
 
     // Cache the result
-    let news_json: Value = serde_json::to_value(&news)
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
-    app_state.cache_service.set(&cache_key, &news_json, TTL_NEWS).await;
+    let news_json: Value = serde_json::to_value(&news).map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e))
+    })?;
+    app_state
+        .cache_service
+        .set(&cache_key, &news_json, TTL_NEWS)
+        .await;
 
     Ok(HttpResponse::Ok().json(news))
 }

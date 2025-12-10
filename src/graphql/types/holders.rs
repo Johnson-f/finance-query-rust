@@ -1,20 +1,19 @@
 use async_graphql::*;
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use finance_query_core::models::holders::{
-    MajorHoldersBreakdown as MajorHoldersBreakdownModel,
-    InstitutionalHolder as InstitutionalHolderModel,
-    MutualFundHolder as MutualFundHolderModel,
-    InsiderTransaction as InsiderTransactionModel,
     InsiderPurchase as InsiderPurchaseModel,
-    InsiderRosterMember as InsiderRosterMemberModel,
-    MajorHoldersResponse as MajorHoldersResponseModel,
-    InstitutionalHoldersResponse as InstitutionalHoldersResponseModel,
-    MutualFundHoldersResponse as MutualFundHoldersResponseModel,
-    InsiderTransactionsResponse as InsiderTransactionsResponseModel,
     InsiderPurchasesResponse as InsiderPurchasesResponseModel,
+    InsiderRosterMember as InsiderRosterMemberModel,
     InsiderRosterResponse as InsiderRosterResponseModel,
+    InsiderTransaction as InsiderTransactionModel,
+    InsiderTransactionsResponse as InsiderTransactionsResponseModel,
+    InstitutionalHolder as InstitutionalHolderModel,
+    InstitutionalHoldersResponse as InstitutionalHoldersResponseModel,
+    MajorHoldersBreakdown as MajorHoldersBreakdownModel,
+    MajorHoldersResponse as MajorHoldersResponseModel, MutualFundHolder as MutualFundHolderModel,
+    MutualFundHoldersResponse as MutualFundHoldersResponseModel,
 };
+use std::collections::HashMap;
 
 #[derive(SimpleObject, Clone)]
 pub struct MajorHoldersBreakdown {
@@ -25,7 +24,9 @@ pub struct MajorHoldersBreakdown {
 impl From<MajorHoldersBreakdownModel> for MajorHoldersBreakdown {
     fn from(breakdown: MajorHoldersBreakdownModel) -> Self {
         MajorHoldersBreakdown {
-            breakdown_data: breakdown.breakdown_data.into_iter()
+            breakdown_data: breakdown
+                .breakdown_data
+                .into_iter()
                 .map(|(k, v)| (k, async_graphql::Json(v)))
                 .collect(),
         }
@@ -202,7 +203,11 @@ impl From<InstitutionalHoldersResponseModel> for InstitutionalHoldersResponse {
     fn from(response: InstitutionalHoldersResponseModel) -> Self {
         InstitutionalHoldersResponse {
             symbol: response.symbol,
-            holders: response.holders.into_iter().map(InstitutionalHolder::from).collect(),
+            holders: response
+                .holders
+                .into_iter()
+                .map(InstitutionalHolder::from)
+                .collect(),
         }
     }
 }
@@ -217,7 +222,11 @@ impl From<MutualFundHoldersResponseModel> for MutualFundHoldersResponse {
     fn from(response: MutualFundHoldersResponseModel) -> Self {
         MutualFundHoldersResponse {
             symbol: response.symbol,
-            holders: response.holders.into_iter().map(MutualFundHolder::from).collect(),
+            holders: response
+                .holders
+                .into_iter()
+                .map(MutualFundHolder::from)
+                .collect(),
         }
     }
 }
@@ -232,7 +241,11 @@ impl From<InsiderTransactionsResponseModel> for InsiderTransactionsResponse {
     fn from(response: InsiderTransactionsResponseModel) -> Self {
         InsiderTransactionsResponse {
             symbol: response.symbol,
-            transactions: response.transactions.into_iter().map(InsiderTransaction::from).collect(),
+            transactions: response
+                .transactions
+                .into_iter()
+                .map(InsiderTransaction::from)
+                .collect(),
         }
     }
 }
@@ -262,7 +275,11 @@ impl From<InsiderRosterResponseModel> for InsiderRosterResponse {
     fn from(response: InsiderRosterResponseModel) -> Self {
         InsiderRosterResponse {
             symbol: response.symbol,
-            roster: response.roster.into_iter().map(InsiderRosterMember::from).collect(),
+            roster: response
+                .roster
+                .into_iter()
+                .map(InsiderRosterMember::from)
+                .collect(),
         }
     }
 }

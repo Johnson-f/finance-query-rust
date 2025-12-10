@@ -45,11 +45,19 @@ impl MarketSchedule {
         schedule
     }
 
-    fn get_nth_weekday_of_month(&self, year: i32, month: u32, weekday: Weekday, n: u32) -> NaiveDate {
+    fn get_nth_weekday_of_month(
+        &self,
+        year: i32,
+        month: u32,
+        weekday: Weekday,
+        n: u32,
+    ) -> NaiveDate {
         let first_day = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
         let first_weekday = first_day.weekday();
-        
-        let days_until = (weekday.number_from_monday() as i32 - first_weekday.number_from_monday() as i32 + 7) % 7;
+
+        let days_until =
+            (weekday.number_from_monday() as i32 - first_weekday.number_from_monday() as i32 + 7)
+                % 7;
         first_day + chrono::Duration::days(days_until as i64 + ((n - 1) * 7) as i64)
     }
 
@@ -58,7 +66,7 @@ impl MarketSchedule {
         let next_year = if month == 12 { year + 1 } else { year };
         let first_day_next = NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap();
         let last_day = first_day_next - chrono::Duration::days(1);
-        
+
         let days_back = (last_day.weekday().number_from_monday() as i32 - 1 + 7) % 7;
         last_day - chrono::Duration::days(days_back as i64)
     }
@@ -127,10 +135,8 @@ impl MarketSchedule {
             self.get_nth_weekday_of_month(self.year, 11, Weekday::Thu, 4),
             "Thanksgiving Day".to_string(),
         );
-        self.full_holidays.insert(
-            self.get_good_friday(self.year),
-            "Good Friday".to_string(),
-        );
+        self.full_holidays
+            .insert(self.get_good_friday(self.year), "Good Friday".to_string());
 
         // Early closure dates
         self.early_close_dates.insert(
@@ -169,10 +175,16 @@ impl MarketSchedule {
 
             let weekday = holiday_date.weekday();
             if weekday == Weekday::Sat {
-                weekend_adjustments.insert(*holiday_date - chrono::Duration::days(1), holiday_name.clone());
+                weekend_adjustments.insert(
+                    *holiday_date - chrono::Duration::days(1),
+                    holiday_name.clone(),
+                );
                 weekend_removals.push(*holiday_date);
             } else if weekday == Weekday::Sun {
-                weekend_adjustments.insert(*holiday_date + chrono::Duration::days(1), holiday_name.clone());
+                weekend_adjustments.insert(
+                    *holiday_date + chrono::Duration::days(1),
+                    holiday_name.clone(),
+                );
                 weekend_removals.push(*holiday_date);
             }
         }
@@ -195,7 +207,10 @@ impl MarketSchedule {
 
         // Check if it's a holiday
         if let Some(holiday_name) = self.full_holidays.get(&current_date) {
-            return (MarketStatus::Closed, Some(format!("Holiday: {}", holiday_name)));
+            return (
+                MarketStatus::Closed,
+                Some(format!("Holiday: {}", holiday_name)),
+            );
         }
 
         // Check if it's an early closure day
@@ -221,7 +236,10 @@ impl MarketSchedule {
         } else if current_time >= self.regular_close {
             (MarketStatus::Closed, Some("After-hours".to_string()))
         } else {
-            (MarketStatus::Open, Some("Regular trading hours".to_string()))
+            (
+                MarketStatus::Open,
+                Some("Regular trading hours".to_string()),
+            )
         }
     }
 }
@@ -231,4 +249,3 @@ impl Default for MarketSchedule {
         Self::new()
     }
 }
-

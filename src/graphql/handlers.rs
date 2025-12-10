@@ -1,11 +1,8 @@
-use actix_web::{web, HttpRequest, HttpResponse, Result};
-use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use crate::graphql::{AppContext, AppSchema};
+use actix_web::{HttpRequest, HttpResponse, Result, web};
+use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 
-pub async fn graphql_handler(
-    schema: web::Data<AppSchema>,
-    req: GraphQLRequest,
-) -> GraphQLResponse {
+pub async fn graphql_handler(schema: web::Data<AppSchema>, req: GraphQLRequest) -> GraphQLResponse {
     schema.execute(req.into_inner()).await.into()
 }
 
@@ -30,7 +27,7 @@ pub async fn graphql_ws_handler(
     data.insert(ctx);
     GraphQLSubscription::new(schema.get_ref().clone())
         .with_data(data)
-        .on_connection_init(|_value| async { 
+        .on_connection_init(|_value| async {
             Ok::<_, async_graphql::Error>(async_graphql::Data::default())
         })
         .start(&req, body)

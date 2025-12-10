@@ -1,8 +1,8 @@
-use actix_web::{web, HttpResponse, Result};
-use finance_query_core::models::{StatementType, Frequency};
 use crate::error::IntoWebResult;
 use crate::service;
-use crate::service::caching::{financials_key, TTL_FINANCIALS};
+use crate::service::caching::{TTL_FINANCIALS, financials_key};
+use actix_web::{HttpResponse, Result, web};
+use finance_query_core::models::{Frequency, StatementType};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -18,14 +18,14 @@ pub async fn get_financials_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
-    
+
     let statement_type = parse_statement_type(&query.statement)
         .map_err(|_| actix_web::error::ErrorBadRequest("Invalid statement type"))?;
     let frequency = parse_frequency(&query.frequency)
         .map_err(|_| actix_web::error::ErrorBadRequest("Invalid frequency"))?;
 
     let cache_key = financials_key(&symbol, &query.statement, &query.frequency);
-    
+
     // Check cache first
     if let Some(cached) = app_state.cache_service.get::<Value>(&cache_key).await {
         return Ok(HttpResponse::Ok().json(cached));
@@ -42,9 +42,13 @@ pub async fn get_financials_handler(
     .into_web_result()?;
 
     // Cache the result
-    let financials_json: Value = serde_json::to_value(&financials)
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e)))?;
-    app_state.cache_service.set(&cache_key, &financials_json, TTL_FINANCIALS).await;
+    let financials_json: Value = serde_json::to_value(&financials).map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to serialize response: {}", e))
+    })?;
+    app_state
+        .cache_service
+        .set(&cache_key, &financials_json, TTL_FINANCIALS)
+        .await;
 
     Ok(HttpResponse::Ok().json(financials))
 }
@@ -65,4 +69,3 @@ fn parse_frequency(s: &str) -> Result<Frequency, ()> {
         _ => Err(()),
     }
 }
-

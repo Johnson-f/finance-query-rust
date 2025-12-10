@@ -1,12 +1,9 @@
 use async_graphql::*;
-use std::collections::HashMap;
 use finance_query_core::models::historical::{
-    HistoricalData as HistoricalDataModel,
-    HistoricalResponse as HistoricalResponseModel,
-    TimeRange as TimeRangeModel,
-    Interval as IntervalModel,
-    IndicatorType as IndicatorTypeModel,
+    HistoricalData as HistoricalDataModel, HistoricalResponse as HistoricalResponseModel,
+    IndicatorType as IndicatorTypeModel, Interval as IntervalModel, TimeRange as TimeRangeModel,
 };
+use std::collections::HashMap;
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum TimeRange {
@@ -202,7 +199,9 @@ pub struct HistoricalResponse {
 impl From<HistoricalResponseModel> for HistoricalResponse {
     fn from(response: HistoricalResponseModel) -> Self {
         HistoricalResponse {
-            data: response.data.into_iter()
+            data: response
+                .data
+                .into_iter()
                 .map(|(k, v)| (k, HistoricalData::from(v)))
                 .collect(),
         }

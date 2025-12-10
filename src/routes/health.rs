@@ -20,4 +20,3 @@ pub async fn health_handler() -> Result<HttpResponse> {
         }
     })))
 }
-

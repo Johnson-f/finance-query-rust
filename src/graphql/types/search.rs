@@ -1,5 +1,7 @@
 use async_graphql::*;
-use finance_query_core::models::search::{SearchResult as SearchResultModel, SearchResponse as SearchResponseModel};
+use finance_query_core::models::search::{
+    SearchResponse as SearchResponseModel, SearchResult as SearchResultModel,
+};
 
 #[derive(SimpleObject, Clone)]
 pub struct SearchResult {
@@ -28,7 +30,11 @@ pub struct SearchResponse {
 impl From<SearchResponseModel> for SearchResponse {
     fn from(response: SearchResponseModel) -> Self {
         SearchResponse {
-            results: response.results.into_iter().map(SearchResult::from).collect(),
+            results: response
+                .results
+                .into_iter()
+                .map(SearchResult::from)
+                .collect(),
         }
     }
 }

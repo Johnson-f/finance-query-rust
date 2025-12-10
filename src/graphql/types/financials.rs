@@ -1,10 +1,9 @@
 use async_graphql::*;
-use std::collections::HashMap;
 use finance_query_core::models::financials::{
-    FinancialStatement as FinancialStatementModel,
+    FinancialStatement as FinancialStatementModel, Frequency as FrequencyModel,
     StatementType as StatementTypeModel,
-    Frequency as FrequencyModel,
 };
+use std::collections::HashMap;
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum StatementType {
@@ -76,7 +75,9 @@ impl From<FinancialStatementModel> for FinancialStatement {
             symbol: stmt.symbol,
             statement_type: stmt.statement_type,
             frequency: stmt.frequency,
-            statement: stmt.statement.into_iter()
+            statement: stmt
+                .statement
+                .into_iter()
                 .map(|(k, v)| {
                     let inner_map: HashMap<String, async_graphql::Json<serde_json::Value>> = v
                         .into_iter()

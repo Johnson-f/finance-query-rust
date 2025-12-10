@@ -1,6 +1,6 @@
 use finance_query_core::client::YahooFinanceClient;
 use finance_query_core::client::error::YahooError;
-use finance_query_core::models::{SearchResult, SearchResponse};
+use finance_query_core::models::{SearchResponse, SearchResult};
 use serde_json::Value;
 
 pub async fn search(
@@ -18,19 +18,23 @@ fn parse_search_results(data: Value) -> Result<SearchResponse, YahooError> {
     if let Some(quotes) = data.get("quotes").and_then(|q| q.as_array()) {
         for quote in quotes {
             results.push(SearchResult {
-                symbol: quote.get("symbol")
+                symbol: quote
+                    .get("symbol")
                     .and_then(|s| s.as_str())
                     .unwrap_or("")
                     .to_string(),
-                name: quote.get("longname")
+                name: quote
+                    .get("longname")
                     .or_else(|| quote.get("shortname"))
                     .and_then(|n| n.as_str())
                     .unwrap_or("")
                     .to_string(),
-                exchange: quote.get("exchange")
+                exchange: quote
+                    .get("exchange")
                     .and_then(|e| e.as_str())
                     .map(|s| s.to_string()),
-                quote_type: quote.get("quoteType")
+                quote_type: quote
+                    .get("quoteType")
                     .and_then(|q| q.as_str())
                     .map(|s| s.to_string()),
             });

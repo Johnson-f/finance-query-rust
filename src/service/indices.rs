@@ -1,6 +1,6 @@
-use finance_query_core::client::{error::YahooError, FetchClient, YahooFinanceClient};
-use finance_query_core::models::indices::{get_index_regions, Index, MarketIndex, Region};
 use crate::service::quotes;
+use finance_query_core::client::{FetchClient, YahooFinanceClient, error::YahooError};
+use finance_query_core::models::indices::{Index, MarketIndex, Region, get_index_regions};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -102,32 +102,31 @@ fn get_formatted_index_name(index: Index, default_name: String) -> String {
 
 /// Helper function to extract formatted value from Yahoo API response
 fn get_fmt(data: &Value, key: &str) -> Option<String> {
-    data.get(key)
-        .and_then(|v| {
-            if let Some(obj) = v.as_object() {
-                obj.get("fmt")
-                    .or_else(|| obj.get("raw"))
-                    .and_then(|val| {
-                        val.as_str().map(|s| s.to_string())
-                            .or_else(|| val.as_f64().map(|f| f.to_string()))
-                    })
-            } else if let Some(num) = v.as_f64() {
-                Some(num.to_string())
-            } else {
-                v.as_str().map(|str_val| str_val.to_string())
-            }
-        })
+    data.get(key).and_then(|v| {
+        if let Some(obj) = v.as_object() {
+            obj.get("fmt").or_else(|| obj.get("raw")).and_then(|val| {
+                val.as_str()
+                    .map(|s| s.to_string())
+                    .or_else(|| val.as_f64().map(|f| f.to_string()))
+            })
+        } else if let Some(num) = v.as_f64() {
+            Some(num.to_string())
+        } else {
+            v.as_str().map(|str_val| str_val.to_string())
+        }
+    })
 }
 
 /// Helper function to format return values with plus sign for positives
 fn format_return(value: Option<&Value>) -> Option<String> {
     value.and_then(|v| {
         let fmt = if let Some(obj) = v.as_object() {
-            obj.get("fmt").and_then(|f| f.as_str().map(|s| s.to_string()))
+            obj.get("fmt")
+                .and_then(|f| f.as_str().map(|s| s.to_string()))
         } else {
             v.as_str().map(|str_val| str_val.to_string())
         };
-        
+
         fmt.map(|f| {
             if !f.starts_with('-') && f != "0.00%" {
                 format!("+{}", f)
@@ -139,23 +138,20 @@ fn format_return(value: Option<&Value>) -> Option<String> {
 }
 
 /// Parse Yahoo Finance API response into MarketIndex
-async fn parse_yahoo_index(
-    summary_data: Value,
-    index: Index,
-) -> Result<MarketIndex, YahooError> {
+async fn parse_yahoo_index(summary_data: Value, index: Index) -> Result<MarketIndex, YahooError> {
     let summary_result = summary_data
         .get("quoteSummary")
         .and_then(|qs| qs.get("result"))
         .and_then(|r| r.as_array())
         .and_then(|arr| arr.first())
         .ok_or_else(|| YahooError::ParseError("No quoteSummary result found".to_string()))?;
-    
+
     let price_data = summary_result.get("price").unwrap_or(&Value::Null);
     let performance_data = summary_result
         .get("quoteUnadjustedPerformanceOverview")
         .and_then(|q| q.get("performanceOverview"))
         .unwrap_or(&Value::Null);
-    
+
     // Get name
     let default_name = price_data
         .get("longName")
@@ -164,7 +160,7 @@ async fn parse_yahoo_index(
         .map(|s| s.to_string())
         .unwrap_or_else(|| index.as_str().to_string());
     let formatted_name = get_formatted_index_name(index, default_name);
-    
+
     // Get value (round to 2 decimal places)
     let value = price_data
         .get("regularMarketPrice")
@@ -177,12 +173,11 @@ async fn parse_yahoo_index(
         })
         .map(|v| (v * 100.0).round() / 100.0)
         .unwrap_or(0.0);
-    
+
     Ok(MarketIndex {
         name: formatted_name,
         value,
-        change: get_fmt(price_data, "regularMarketChange")
-            .unwrap_or_else(|| "0.0".to_string()),
+        change: get_fmt(price_data, "regularMarketChange").unwrap_or_else(|| "0.0".to_string()),
         percent_change: get_fmt(price_data, "regularMarketChangePercent")
             .unwrap_or_else(|| "0.0%".to_string()),
         five_days_return: format_return(performance_data.get("fiveDaysReturn")),
@@ -206,7 +201,7 @@ async fn fetch_index(
 ) -> Result<MarketIndex, YahooError> {
     let symbol = get_yahoo_index_symbol(index);
     info!("Fetching index {} (symbol: {})", index.as_str(), symbol);
-    
+
     // Try the full quote-summary endpoint first
     match yahoo_client.get_quote(&symbol).await {
         Ok(data) => {
@@ -214,10 +209,13 @@ async fn fetch_index(
             return parse_yahoo_index(data, index).await;
         }
         Err(e) => {
-            warn!("Failed to fetch quote-summary for {}: {}, trying fallback", symbol, e);
+            warn!(
+                "Failed to fetch quote-summary for {}: {}, trying fallback",
+                symbol, e
+            );
         }
     }
-    
+
     // If that fails, try the simple quotes endpoint
     match yahoo_client.get_simple_quotes(&[&symbol]).await {
         Ok(data) => {
@@ -241,10 +239,13 @@ async fn fetch_index(
             }
         }
         Err(e) => {
-            warn!("Failed to fetch simple quotes for {}: {}, trying final fallback", symbol, e);
+            warn!(
+                "Failed to fetch simple quotes for {}: {}, trying final fallback",
+                symbol, e
+            );
         }
     }
-    
+
     // As last resort, try get_quotes which might use scraping
     match quotes::get_quotes(yahoo_client, fetch_client, &[&symbol]).await {
         Ok(quotes_data) => {
@@ -272,9 +273,12 @@ async fn fetch_index(
             warn!("Failed to fetch quote via scraping for {}: {}", symbol, e);
         }
     }
-    
+
     // If all else fails, create a minimal MarketIndex
-    warn!("All fetch methods failed for {}, returning minimal index", symbol);
+    warn!(
+        "All fetch methods failed for {}, returning minimal index",
+        symbol
+    );
     Ok(MarketIndex {
         name: index.as_str().to_string(),
         value: 0.0,
@@ -302,12 +306,12 @@ pub async fn get_indices(
 ) -> Result<Vec<MarketIndex>, YahooError> {
     let index_regions = get_index_regions();
     let mut selected_indices: HashSet<Index> = HashSet::new();
-    
+
     // Add explicitly requested indices
     if let Some(requested_indices) = indices {
         selected_indices.extend(requested_indices);
     }
-    
+
     // Add indices from selected region
     if let Some(selected_region) = region {
         for (idx, idx_region) in &index_regions {
@@ -318,20 +322,20 @@ pub async fn get_indices(
             }
         }
     }
-    
+
     // If no indices selected, get all
     if selected_indices.is_empty() {
         selected_indices = Index::all().into_iter().collect();
     }
-    
+
     // Convert back to ordered list
     let ordered_indices: Vec<Index> = Index::all()
         .into_iter()
         .filter(|idx| selected_indices.contains(idx))
         .collect();
-    
+
     info!("Fetching {} indices", ordered_indices.len());
-    
+
     // Fetch indices sequentially (can be optimized to concurrent later if needed)
     let mut results = Vec::new();
     for index in ordered_indices {
@@ -361,7 +365,7 @@ pub async fn get_indices(
             }
         }
     }
-    
+
     info!("Successfully fetched {} indices", results.len());
     Ok(results)
 }

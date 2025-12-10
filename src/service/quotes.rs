@@ -1,8 +1,8 @@
-use finance_query_core::client::{scraper, YahooFinanceClient};
-use finance_query_core::client::error::YahooError;
-use finance_query_core::client::FetchClient;
-use finance_query_core::models::{Quote, SimpleQuote};
 use crate::service::logo;
+use finance_query_core::client::FetchClient;
+use finance_query_core::client::error::YahooError;
+use finance_query_core::client::{YahooFinanceClient, scraper};
+use finance_query_core::models::{Quote, SimpleQuote};
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
@@ -13,10 +13,10 @@ pub async fn get_quotes(
     symbols: &[&str],
 ) -> Result<Vec<Quote>, YahooError> {
     info!("Fetching quotes for symbols: {:?}", symbols);
-    
+
     // Check if we should force scraping (for local development/testing)
     let force_scraping = std::env::var("FORCE_SCRAPING").is_ok();
-    
+
     // Fetch detailed quotes using quoteSummary endpoint for each symbol
     let mut quotes = Vec::new();
     for symbol in symbols {
@@ -37,11 +37,16 @@ pub async fn get_quotes(
             }
             continue;
         }
-        
+
         match yahoo_client.get_quote(symbol).await {
             Ok(data) => {
-                debug!("Received quoteSummary response for {}: {}", symbol, serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string()));
-                
+                debug!(
+                    "Received quoteSummary response for {}: {}",
+                    symbol,
+                    serde_json::to_string(&data)
+                        .unwrap_or_else(|_| "Failed to serialize".to_string())
+                );
+
                 // Parse quoteSummary format
                 match parse_quote_from_summary(data, fetch_client, symbol).await {
                     Ok(quote) => {
@@ -63,7 +68,10 @@ pub async fn get_quotes(
                 }
             }
             Err(e) => {
-                warn!("API call failed for {}: {}. Falling back to scraping", symbol, e);
+                warn!(
+                    "API call failed for {}: {}. Falling back to scraping",
+                    symbol, e
+                );
                 // Fallback to scraping
                 match scraper::scrape_quote(fetch_client, symbol).await {
                     Ok(quote_data) => {
@@ -84,7 +92,7 @@ pub async fn get_quotes(
             }
         }
     }
-    
+
     info!("Returning {} quotes", quotes.len());
     Ok(quotes)
 }
@@ -95,18 +103,24 @@ pub async fn get_simple_quotes(
     symbols: &[&str],
 ) -> Result<Vec<SimpleQuote>, YahooError> {
     info!("Fetching simple quotes for symbols: {:?}", symbols);
-    
+
     // Try API first
     match yahoo_client.get_simple_quotes(symbols).await {
         Ok(data) => {
-            debug!("Received API response: {}", serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string()));
-            
+            debug!(
+                "Received API response: {}",
+                serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string())
+            );
+
             // Log the structure to understand what we're getting
             if let Some(quote_response) = data.get("quoteResponse") {
                 debug!("Found quoteResponse in data");
                 if let Some(results) = quote_response.get("result") {
                     if let Some(results_array) = results.as_array() {
-                        info!("Found {} results in quoteResponse.result", results_array.len());
+                        info!(
+                            "Found {} results in quoteResponse.result",
+                            results_array.len()
+                        );
                     } else {
                         warn!("quoteResponse.result is not an array: {:?}", results);
                     }
@@ -114,13 +128,18 @@ pub async fn get_simple_quotes(
                     warn!("No 'result' field in quoteResponse");
                 }
             } else {
-                warn!("No 'quoteResponse' field in API response. Top-level keys: {:?}", 
-                    data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+                warn!(
+                    "No 'quoteResponse' field in API response. Top-level keys: {:?}",
+                    data.as_object().map(|o| o.keys().collect::<Vec<_>>())
+                );
             }
-            
+
             let quotes = parse_simple_quotes_from_api(data)?;
             // Skip logo fetching for WebSocket performance
-            info!("Successfully parsed {} simple quotes from API", quotes.len());
+            info!(
+                "Successfully parsed {} simple quotes from API",
+                quotes.len()
+            );
             Ok(quotes)
         }
         Err(e) => {
@@ -144,7 +163,10 @@ pub async fn get_simple_quotes(
                     }
                 }
             }
-            info!("Returning {} simple quotes from scraping fallback", quotes.len());
+            info!(
+                "Returning {} simple quotes from scraping fallback",
+                quotes.len()
+            );
             Ok(quotes)
         }
     }
@@ -152,33 +174,30 @@ pub async fn get_simple_quotes(
 
 // Helper function to extract formatted value from Yahoo API response
 fn get_fmt(data: &Value, key: &str) -> Option<String> {
-    data.get(key)
-        .and_then(|v| {
-            if let Some(obj) = v.as_object() {
-                obj.get("fmt")
-                    .or_else(|| obj.get("raw"))
-                    .and_then(|val| {
-                        val.as_str().map(|s| s.to_string())
-                            .or_else(|| val.as_f64().map(|f| f.to_string()))
-                    })
-            } else if let Some(num) = v.as_f64() {
-                Some(num.to_string())
-            } else {
-                v.as_str().map(|str_val| str_val.to_string())
-            }
-        })
+    data.get(key).and_then(|v| {
+        if let Some(obj) = v.as_object() {
+            obj.get("fmt").or_else(|| obj.get("raw")).and_then(|val| {
+                val.as_str()
+                    .map(|s| s.to_string())
+                    .or_else(|| val.as_f64().map(|f| f.to_string()))
+            })
+        } else if let Some(num) = v.as_f64() {
+            Some(num.to_string())
+        } else {
+            v.as_str().map(|str_val| str_val.to_string())
+        }
+    })
 }
 
 // Helper function to extract raw numeric value
 fn get_raw(data: &Value, key: &str) -> Option<i64> {
-    data.get(key)
-        .and_then(|v| {
-            if let Some(obj) = v.as_object() {
-                obj.get("raw").and_then(|r| r.as_i64())
-            } else {
-                v.as_i64()
-            }
-        })
+    data.get(key).and_then(|v| {
+        if let Some(obj) = v.as_object() {
+            obj.get("raw").and_then(|r| r.as_i64())
+        } else {
+            v.as_i64()
+        }
+    })
 }
 
 // Helper function to format date
@@ -205,20 +224,22 @@ async fn parse_quote_from_summary(
         .and_then(|r| r.as_array())
         .and_then(|arr| arr.first())
         .ok_or_else(|| YahooError::ParseError("No quoteSummary result found".to_string()))?;
-    
+
     let price_data = summary_result.get("price").unwrap_or(&Value::Null);
     let summary_detail = summary_result.get("summaryDetail").unwrap_or(&Value::Null);
-    let stats = summary_result.get("defaultKeyStatistics").unwrap_or(&Value::Null);
+    let stats = summary_result
+        .get("defaultKeyStatistics")
+        .unwrap_or(&Value::Null);
     let profile = summary_result.get("assetProfile").unwrap_or(&Value::Null);
     let calendar = summary_result.get("calendarEvents").unwrap_or(&Value::Null);
     let performance_overview = summary_result
         .get("quoteUnadjustedPerformanceOverview")
         .and_then(|q| q.get("performanceOverview"))
         .unwrap_or(&Value::Null);
-    
+
     // Extract website URL for logo fetching
     let website_url = profile.get("website").and_then(|w| w.as_str());
-    
+
     // Parse earnings dates
     let earnings_date = calendar
         .get("earnings")
@@ -232,24 +253,22 @@ async fn parse_quote_from_summary(
                 .join(" - ")
         })
         .filter(|s| !s.is_empty());
-    
+
     // Parse ex-dividend date
     let ex_dividend = calendar
         .get("exDividendDate")
         .and_then(|d| get_fmt(d, "fmt"));
-    
+
     // Parse inception date
-    let inception_date = stats
-        .get("fundInceptionDate")
-        .and_then(|d| {
-            if let Some(raw) = d.get("raw").and_then(|r| r.as_i64()) {
-                // Convert epoch to date string if needed
-                Some(raw.to_string())
-            } else {
-                get_fmt(d, "fmt")
-            }
-        });
-    
+    let inception_date = stats.get("fundInceptionDate").and_then(|d| {
+        if let Some(raw) = d.get("raw").and_then(|r| r.as_i64()) {
+            // Convert epoch to date string if needed
+            Some(raw.to_string())
+        } else {
+            get_fmt(d, "fmt")
+        }
+    });
+
     // Parse morningstar rating
     let morningstar_rating = stats
         .get("morningStarOverallRating")
@@ -262,7 +281,7 @@ async fn parse_quote_from_summary(
             }
         })
         .filter(|s| !s.is_empty());
-    
+
     // Parse morningstar risk rating
     let morningstar_risk_rating = stats
         .get("morningStarRiskRating")
@@ -278,13 +297,13 @@ async fn parse_quote_from_summary(
             }
             .to_string()
         });
-    
+
     // Parse employees
     let employees = profile
         .get("fullTimeEmployees")
         .and_then(|e| e.as_i64())
         .map(|e| e.to_string());
-    
+
     Ok(Quote {
         symbol: price_data
             .get("symbol")
@@ -297,8 +316,7 @@ async fn parse_quote_from_summary(
             .and_then(|n| n.as_str())
             .unwrap_or("")
             .to_string(),
-        price: get_fmt(price_data, "regularMarketPrice")
-            .unwrap_or_else(|| "0.0".to_string()),
+        price: get_fmt(price_data, "regularMarketPrice").unwrap_or_else(|| "0.0".to_string()),
         pre_market_price: price_data
             .get("preMarketTime")
             .and_then(|t| t.as_i64())
@@ -309,8 +327,7 @@ async fn parse_quote_from_summary(
             .and_then(|t| t.as_i64())
             .filter(|&time| time > 0)
             .and_then(|_| get_fmt(price_data, "postMarketPrice")),
-        change: get_fmt(price_data, "regularMarketChange")
-            .unwrap_or_else(|| "0.0".to_string()),
+        change: get_fmt(price_data, "regularMarketChange").unwrap_or_else(|| "0.0".to_string()),
         percent_change: get_fmt(price_data, "regularMarketChangePercent")
             .unwrap_or_else(|| "0.0%".to_string()),
         open: get_fmt(summary_detail, "open"),
@@ -329,33 +346,40 @@ async fn parse_quote_from_summary(
         ex_dividend,
         net_assets: get_fmt(summary_detail, "totalAssets"),
         nav: get_fmt(summary_detail, "navPrice"),
-        expense_ratio: stats
-            .get("annualReportExpenseRatio")
-            .and_then(|r| {
-                if let Some(raw) = r.get("raw").and_then(|raw| raw.as_f64()) {
-                    Some(format!("{:.2}%", raw * 100.0))
-                } else {
-                    get_fmt(r, "raw").map(|r| format!("{:.2}%", r.parse::<f64>().unwrap_or(0.0) * 100.0))
-                }
-            }),
-        category: stats.get("category").and_then(|c| c.as_str()).map(|s| s.to_string()),
+        expense_ratio: stats.get("annualReportExpenseRatio").and_then(|r| {
+            if let Some(raw) = r.get("raw").and_then(|raw| raw.as_f64()) {
+                Some(format!("{:.2}%", raw * 100.0))
+            } else {
+                get_fmt(r, "raw")
+                    .map(|r| format!("{:.2}%", r.parse::<f64>().unwrap_or(0.0) * 100.0))
+            }
+        }),
+        category: stats
+            .get("category")
+            .and_then(|c| c.as_str())
+            .map(|s| s.to_string()),
         last_capital_gain: get_fmt(stats, "lastCapGain"),
         morningstar_rating,
         morningstar_risk_rating,
-        holdings_turnover: stats
-            .get("annualHoldingsTurnover")
-            .and_then(|t| {
-                if let Some(raw) = t.get("raw").and_then(|raw| raw.as_f64()) {
-                    Some(format!("{:.2}%", raw * 100.0))
-                } else {
-                    get_fmt(t, "raw").map(|t| format!("{:.2}%", t.parse::<f64>().unwrap_or(0.0) * 100.0))
-                }
-            }),
+        holdings_turnover: stats.get("annualHoldingsTurnover").and_then(|t| {
+            if let Some(raw) = t.get("raw").and_then(|raw| raw.as_f64()) {
+                Some(format!("{:.2}%", raw * 100.0))
+            } else {
+                get_fmt(t, "raw")
+                    .map(|t| format!("{:.2}%", t.parse::<f64>().unwrap_or(0.0) * 100.0))
+            }
+        }),
         earnings_date,
         last_dividend: get_fmt(stats, "lastDividendValue"),
         inception_date,
-        sector: profile.get("sector").and_then(|s| s.as_str()).map(|s| s.to_string()),
-        industry: profile.get("industry").and_then(|i| i.as_str()).map(|s| s.to_string()),
+        sector: profile
+            .get("sector")
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string()),
+        industry: profile
+            .get("industry")
+            .and_then(|i| i.as_str())
+            .map(|s| s.to_string()),
         about: profile
             .get("longBusinessSummary")
             .and_then(|a| a.as_str())
@@ -378,14 +402,17 @@ async fn parse_quote_from_summary(
 #[allow(dead_code)]
 fn parse_quotes_from_api(data: Value) -> Result<Vec<Quote>, YahooError> {
     let mut quotes = Vec::new();
-    
+
     if let Some(quote_response) = data.get("quoteResponse") {
         if let Some(results) = quote_response.get("result").and_then(|r| r.as_array()) {
             info!("Parsing {} quote results", results.len());
             for (idx, result) in results.iter().enumerate() {
                 match parse_quote_from_api_result(result) {
                     Ok(quote) => {
-                        debug!("Successfully parsed quote {}: symbol={}, price={}", idx, quote.symbol, quote.price);
+                        debug!(
+                            "Successfully parsed quote {}: symbol={}, price={}",
+                            idx, quote.symbol, quote.price
+                        );
                         quotes.push(quote);
                     }
                     Err(e) => {
@@ -399,30 +426,35 @@ fn parse_quotes_from_api(data: Value) -> Result<Vec<Quote>, YahooError> {
     } else {
         warn!("No 'quoteResponse' found in data");
     }
-    
+
     if quotes.is_empty() {
-        warn!("No quotes parsed from API response. Response structure: {}", 
-            serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string()));
+        warn!(
+            "No quotes parsed from API response. Response structure: {}",
+            serde_json::to_string(&data).unwrap_or_else(|_| "Failed to serialize".to_string())
+        );
     }
-    
+
     Ok(quotes)
 }
 
 #[allow(dead_code)]
 fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
-    let symbol = result.get("symbol")
+    let symbol = result
+        .get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or("")
         .to_string();
-    
+
     debug!("Parsing quote for symbol: {}", symbol);
-    
+
     // Check if regularMarketPrice exists and log its structure
     if let Some(price_val) = result.get("regularMarketPrice") {
         debug!("regularMarketPrice for {}: {:?}", symbol, price_val);
         if price_val.is_object() {
-            debug!("regularMarketPrice is an object with keys: {:?}", 
-                price_val.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+            debug!(
+                "regularMarketPrice is an object with keys: {:?}",
+                price_val.as_object().map(|o| o.keys().collect::<Vec<_>>())
+            );
         } else if price_val.is_number() {
             debug!("regularMarketPrice is a number: {:?}", price_val.as_f64());
         } else if price_val.is_string() {
@@ -433,15 +465,17 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
     } else {
         warn!("No regularMarketPrice field found for {}", symbol);
     }
-    
-    let price = result.get("regularMarketPrice")
+
+    let price = result
+        .get("regularMarketPrice")
         .and_then(|p| {
             // Try to get as object first (fmt/raw structure)
             if let Some(obj) = p.as_object() {
-                obj.get("fmt")
-                    .or_else(|| obj.get("raw"))
-                    .and_then(|v| v.as_str().map(|s| s.to_string())
-                        .or_else(|| v.as_f64().map(|f| f.to_string())))
+                obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                    v.as_str()
+                        .map(|s| s.to_string())
+                        .or_else(|| v.as_f64().map(|f| f.to_string()))
+                })
             } else if let Some(num) = p.as_f64() {
                 // Direct number
                 Some(num.to_string())
@@ -454,40 +488,45 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
             warn!("Could not extract price for {}, defaulting to 0.0", symbol);
             "0.0".to_string()
         });
-    
+
     Ok(Quote {
         symbol,
-        name: result.get("longName")
+        name: result
+            .get("longName")
             .or_else(|| result.get("shortName"))
             .and_then(|n| n.as_str())
             .unwrap_or("")
             .to_string(),
         price,
-        pre_market_price: result.get("preMarketPrice")
-            .and_then(|p| p.get("fmt").or_else(|| p.get("raw"))
-                .and_then(|v| v.as_str().map(|s| s.to_string())
-                    .or_else(|| v.as_f64().map(|f| f.to_string())))
-            ),
-        after_hours_price: result.get("postMarketPrice")
-            .and_then(|p| {
-                if let Some(obj) = p.as_object() {
-                    obj.get("fmt")
-                        .or_else(|| obj.get("raw"))
-                        .and_then(|v| v.as_str().map(|s| s.to_string())
-                            .or_else(|| v.as_f64().map(|f| f.to_string())))
-                } else if let Some(num) = p.as_f64() {
-                    Some(num.to_string())
-                } else {
-                    p.as_str().map(|str_val| str_val.to_string())
-                }
-            }),
-        change: result.get("regularMarketChange")
+        pre_market_price: result.get("preMarketPrice").and_then(|p| {
+            p.get("fmt").or_else(|| p.get("raw")).and_then(|v| {
+                v.as_str()
+                    .map(|s| s.to_string())
+                    .or_else(|| v.as_f64().map(|f| f.to_string()))
+            })
+        }),
+        after_hours_price: result.get("postMarketPrice").and_then(|p| {
+            if let Some(obj) = p.as_object() {
+                obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                    v.as_str()
+                        .map(|s| s.to_string())
+                        .or_else(|| v.as_f64().map(|f| f.to_string()))
+                })
+            } else if let Some(num) = p.as_f64() {
+                Some(num.to_string())
+            } else {
+                p.as_str().map(|str_val| str_val.to_string())
+            }
+        }),
+        change: result
+            .get("regularMarketChange")
             .and_then(|c| {
                 if let Some(obj) = c.as_object() {
-                    obj.get("fmt")
-                        .or_else(|| obj.get("raw"))
-                        .and_then(|v| v.as_str().map(|s| s.to_string())
-                            .or_else(|| v.as_f64().map(|f| f.to_string())))
+                    obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                        v.as_str()
+                            .map(|s| s.to_string())
+                            .or_else(|| v.as_f64().map(|f| f.to_string()))
+                    })
                 } else if let Some(num) = c.as_f64() {
                     Some(num.to_string())
                 } else {
@@ -495,13 +534,15 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
                 }
             })
             .unwrap_or_else(|| "0.0".to_string()),
-        percent_change: result.get("regularMarketChangePercent")
+        percent_change: result
+            .get("regularMarketChangePercent")
             .and_then(|p| {
                 if let Some(obj) = p.as_object() {
-                    obj.get("fmt")
-                        .or_else(|| obj.get("raw"))
-                        .and_then(|v| v.as_str().map(|s| s.to_string())
-                            .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f))))
+                    obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                        v.as_str()
+                            .map(|s| s.to_string())
+                            .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f)))
+                    })
                 } else if let Some(num) = p.as_f64() {
                     Some(format!("{:.2}%", num))
                 } else {
@@ -554,14 +595,17 @@ fn parse_quote_from_api_result(result: &Value) -> Result<Quote, YahooError> {
 
 fn parse_simple_quotes_from_api(data: Value) -> Result<Vec<SimpleQuote>, YahooError> {
     let mut quotes = Vec::new();
-    
+
     if let Some(quote_response) = data.get("quoteResponse") {
         if let Some(results) = quote_response.get("result").and_then(|r| r.as_array()) {
             info!("Parsing {} simple quote results", results.len());
             for (idx, result) in results.iter().enumerate() {
                 match parse_simple_quote_from_api_result(result) {
                     Ok(quote) => {
-                        debug!("Successfully parsed simple quote {}: symbol={}, price={}", idx, quote.symbol, quote.price);
+                        debug!(
+                            "Successfully parsed simple quote {}: symbol={}, price={}",
+                            idx, quote.symbol, quote.price
+                        );
                         quotes.push(quote);
                     }
                     Err(e) => {
@@ -575,29 +619,32 @@ fn parse_simple_quotes_from_api(data: Value) -> Result<Vec<SimpleQuote>, YahooEr
     } else {
         warn!("No 'quoteResponse' found in data");
     }
-    
+
     if quotes.is_empty() {
         warn!("No simple quotes parsed from API response");
     }
-    
+
     Ok(quotes)
 }
 
 fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, YahooError> {
-    let symbol = result.get("symbol")
+    let symbol = result
+        .get("symbol")
         .and_then(|s| s.as_str())
         .unwrap_or("")
         .to_string();
-    
+
     debug!("Parsing simple quote for symbol: {}", symbol);
-    
-    let price = result.get("regularMarketPrice")
+
+    let price = result
+        .get("regularMarketPrice")
         .and_then(|p| {
             if let Some(obj) = p.as_object() {
-                obj.get("fmt")
-                    .or_else(|| obj.get("raw"))
-                    .and_then(|v| v.as_str().map(|s| s.to_string())
-                        .or_else(|| v.as_f64().map(|f| f.to_string())))
+                obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                    v.as_str()
+                        .map(|s| s.to_string())
+                        .or_else(|| v.as_f64().map(|f| f.to_string()))
+                })
             } else if let Some(num) = p.as_f64() {
                 Some(num.to_string())
             } else {
@@ -608,48 +655,51 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
             warn!("Could not extract price for {}, defaulting to 0.0", symbol);
             "0.0".to_string()
         });
-    
+
     Ok(SimpleQuote {
         symbol,
-        name: result.get("longName")
+        name: result
+            .get("longName")
             .or_else(|| result.get("shortName"))
             .and_then(|n| n.as_str())
             .unwrap_or("")
             .to_string(),
         price,
-        pre_market_price: result.get("preMarketPrice")
-            .and_then(|p| {
-                if let Some(obj) = p.as_object() {
-                    obj.get("fmt")
-                        .or_else(|| obj.get("raw"))
-                        .and_then(|v| v.as_str().map(|s| s.to_string())
-                            .or_else(|| v.as_f64().map(|f| f.to_string())))
-                } else if let Some(num) = p.as_f64() {
-                    Some(num.to_string())
-                } else {
-                    p.as_str().map(|str_val| str_val.to_string())
-                }
-            }),
-        after_hours_price: result.get("postMarketPrice")
-            .and_then(|p| {
-                if let Some(obj) = p.as_object() {
-                    obj.get("fmt")
-                        .or_else(|| obj.get("raw"))
-                        .and_then(|v| v.as_str().map(|s| s.to_string())
-                            .or_else(|| v.as_f64().map(|f| f.to_string())))
-                } else if let Some(num) = p.as_f64() {
-                    Some(num.to_string())
-                } else {
-                    p.as_str().map(|str_val| str_val.to_string())
-                }
-            }),
-        change: result.get("regularMarketChange")
+        pre_market_price: result.get("preMarketPrice").and_then(|p| {
+            if let Some(obj) = p.as_object() {
+                obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                    v.as_str()
+                        .map(|s| s.to_string())
+                        .or_else(|| v.as_f64().map(|f| f.to_string()))
+                })
+            } else if let Some(num) = p.as_f64() {
+                Some(num.to_string())
+            } else {
+                p.as_str().map(|str_val| str_val.to_string())
+            }
+        }),
+        after_hours_price: result.get("postMarketPrice").and_then(|p| {
+            if let Some(obj) = p.as_object() {
+                obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                    v.as_str()
+                        .map(|s| s.to_string())
+                        .or_else(|| v.as_f64().map(|f| f.to_string()))
+                })
+            } else if let Some(num) = p.as_f64() {
+                Some(num.to_string())
+            } else {
+                p.as_str().map(|str_val| str_val.to_string())
+            }
+        }),
+        change: result
+            .get("regularMarketChange")
             .and_then(|c| {
                 if let Some(obj) = c.as_object() {
-                    obj.get("fmt")
-                        .or_else(|| obj.get("raw"))
-                        .and_then(|v| v.as_str().map(|s| s.to_string())
-                            .or_else(|| v.as_f64().map(|f| f.to_string())))
+                    obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                        v.as_str()
+                            .map(|s| s.to_string())
+                            .or_else(|| v.as_f64().map(|f| f.to_string()))
+                    })
                 } else if let Some(num) = c.as_f64() {
                     Some(num.to_string())
                 } else {
@@ -657,13 +707,15 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
                 }
             })
             .unwrap_or_else(|| "0.0".to_string()),
-        percent_change: result.get("regularMarketChangePercent")
+        percent_change: result
+            .get("regularMarketChangePercent")
             .and_then(|p| {
                 if let Some(obj) = p.as_object() {
-                    obj.get("fmt")
-                        .or_else(|| obj.get("raw"))
-                        .and_then(|v| v.as_str().map(|s| s.to_string())
-                            .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f))))
+                    obj.get("fmt").or_else(|| obj.get("raw")).and_then(|v| {
+                        v.as_str()
+                            .map(|s| s.to_string())
+                            .or_else(|| v.as_f64().map(|f| format!("{:.2}%", f)))
+                    })
                 } else if let Some(num) = p.as_f64() {
                     Some(format!("{:.2}%", num))
                 } else {
@@ -677,23 +729,28 @@ fn parse_simple_quote_from_api_result(result: &Value) -> Result<SimpleQuote, Yah
 
 fn parse_quote_from_scraped(data: Value) -> Result<Quote, YahooError> {
     Ok(Quote {
-        symbol: data.get("symbol")
+        symbol: data
+            .get("symbol")
             .and_then(|s| s.as_str())
             .unwrap_or("")
             .to_string(),
-        name: data.get("name")
+        name: data
+            .get("name")
             .and_then(|n| n.as_str())
             .unwrap_or("")
             .to_string(),
-        price: data.get("price")
+        price: data
+            .get("price")
             .and_then(|p| p.as_f64().map(|f| f.to_string()))
             .unwrap_or_else(|| "0.0".to_string()),
         pre_market_price: None,
         after_hours_price: None,
-        change: data.get("change")
+        change: data
+            .get("change")
             .and_then(|c| c.as_f64().map(|f| f.to_string()))
             .unwrap_or_else(|| "0.0".to_string()),
-        percent_change: data.get("percent_change")
+        percent_change: data
+            .get("percent_change")
             .and_then(|p| p.as_f64().map(|f| format!("{:.2}%", f)))
             .unwrap_or_else(|| "0.0%".to_string()),
         open: None,
@@ -741,23 +798,28 @@ fn parse_quote_from_scraped(data: Value) -> Result<Quote, YahooError> {
 
 fn parse_simple_quote_from_scraped(data: Value) -> Result<SimpleQuote, YahooError> {
     Ok(SimpleQuote {
-        symbol: data.get("symbol")
+        symbol: data
+            .get("symbol")
             .and_then(|s| s.as_str())
             .unwrap_or("")
             .to_string(),
-        name: data.get("name")
+        name: data
+            .get("name")
             .and_then(|n| n.as_str())
             .unwrap_or("")
             .to_string(),
-        price: data.get("price")
+        price: data
+            .get("price")
             .and_then(|p| p.as_f64().map(|f| f.to_string()))
             .unwrap_or_else(|| "0.0".to_string()),
         pre_market_price: None,
         after_hours_price: None,
-        change: data.get("change")
+        change: data
+            .get("change")
             .and_then(|c| c.as_f64().map(|f| f.to_string()))
             .unwrap_or_else(|| "0.0".to_string()),
-        percent_change: data.get("percent_change")
+        percent_change: data
+            .get("percent_change")
             .and_then(|p| p.as_f64().map(|f| format!("{:.2}%", f)))
             .unwrap_or_else(|| "0.0%".to_string()),
         logo: None,
@@ -770,11 +832,14 @@ pub async fn get_similar_quotes(
     symbol: &str,
     limit: usize,
 ) -> Result<Vec<SimpleQuote>, YahooError> {
-    info!("Fetching similar quotes for symbol: {} (limit: {})", symbol, limit);
-    
+    info!(
+        "Fetching similar quotes for symbol: {} (limit: {})",
+        symbol, limit
+    );
+
     // Get similar symbols from Yahoo API
     let similar_data = yahoo_client.get_similar_quotes(symbol, limit).await?;
-    
+
     // Extract symbols from the response
     let symbols: Vec<&str> = similar_data
         .get("finance")
@@ -790,14 +855,14 @@ pub async fn get_similar_quotes(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    
+
     if symbols.is_empty() {
         warn!("No similar symbols found for {}", symbol);
         return Ok(Vec::new());
     }
-    
+
     info!("Found {} similar symbols: {:?}", symbols.len(), symbols);
-    
+
     // Fetch simple quotes for the similar symbols
     get_simple_quotes(yahoo_client, fetch_client, &symbols).await
 }

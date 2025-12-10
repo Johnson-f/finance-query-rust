@@ -1,9 +1,9 @@
-use actix_web::{web, HttpResponse, Result};
-use finance_query_core::models::{TimeRange, Interval};
-use finance_query_core::models::historical::IndicatorType;
 use crate::error::IntoWebResult;
 use crate::service;
 use crate::service::historical::calculate_indicators;
+use actix_web::{HttpResponse, Result, web};
+use finance_query_core::models::historical::IndicatorType;
+use finance_query_core::models::{Interval, TimeRange};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -22,7 +22,7 @@ pub async fn get_historical_handler(
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
     let symbol = path.into_inner();
-    
+
     let time_range = parse_time_range(&query.range)
         .map_err(|_| actix_web::error::ErrorBadRequest("Invalid time range"))?;
     let interval = parse_interval(&query.interval)
@@ -31,31 +31,31 @@ pub async fn get_historical_handler(
     // Validate minute intervals can only be used with 1d or 5d ranges
     validate_interval_range_compatibility(&interval, &time_range)?;
 
-    let mut historical = service::get_historical(
-        &app_state.yahoo_client,
-        &symbol,
-        time_range,
-        interval,
-    )
-    .await
-    .into_web_result()?;
+    let mut historical =
+        service::get_historical(&app_state.yahoo_client, &symbol, time_range, interval)
+            .await
+            .into_web_result()?;
 
     // Calculate indicators if requested
     if let Some(indicators_str) = &query.indicators {
         let requested_indicators = IndicatorType::parse_list(indicators_str);
-        
+
         if requested_indicators.is_empty() {
-            return Err(actix_web::error::ErrorBadRequest("Invalid indicator type. Supported: sma, ema"));
+            return Err(actix_web::error::ErrorBadRequest(
+                "Invalid indicator type. Supported: sma, ema",
+            ));
         }
-        
+
         // Parse periods (comma-separated, e.g., "10,20,50")
         let periods_str = query.period.as_deref().unwrap_or("20");
         let periods = parse_periods(periods_str)?;
-        
+
         if periods.is_empty() {
-            return Err(actix_web::error::ErrorBadRequest("At least one period must be specified"));
+            return Err(actix_web::error::ErrorBadRequest(
+                "At least one period must be specified",
+            ));
         }
-        
+
         historical = calculate_indicators(historical, &periods, &requested_indicators);
     }
 
@@ -98,7 +98,7 @@ fn parse_interval(s: &str) -> Result<Interval, ()> {
     }
 }
 
-/// Validates that minute intervals (1m, 3m, 5m, 10m, 15m, 20m, 30m, 65m) 
+/// Validates that minute intervals (1m, 3m, 5m, 10m, 15m, 20m, 30m, 65m)
 /// can only be used with 1d or 5d ranges
 fn validate_interval_range_compatibility(
     interval: &Interval,
@@ -119,7 +119,7 @@ fn validate_interval_range_compatibility(
 
     if restricted_minute_intervals {
         let allowed_ranges = matches!(time_range, TimeRange::Day | TimeRange::FiveDays);
-        
+
         if !allowed_ranges {
             return Err(actix_web::error::ErrorBadRequest(format!(
                 "The interval '{}' can only be used with ranges '1d' or '5d'. Please use one of these ranges or choose a different interval.",
@@ -139,24 +139,31 @@ fn parse_periods(periods_str: &str) -> Result<Vec<usize>, actix_web::Error> {
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| {
-            s.parse::<usize>()
-                .map_err(|_| actix_web::error::ErrorBadRequest(format!("Invalid period value: '{}'. Periods must be positive integers.", s)))
+            s.parse::<usize>().map_err(|_| {
+                actix_web::error::ErrorBadRequest(format!(
+                    "Invalid period value: '{}'. Periods must be positive integers.",
+                    s
+                ))
+            })
         })
         .collect();
-    
+
     let periods = periods?;
-    
+
     // Validate all periods are greater than 0
     for period in &periods {
         if *period == 0 {
-            return Err(actix_web::error::ErrorBadRequest("Period must be greater than 0"));
+            return Err(actix_web::error::ErrorBadRequest(
+                "Period must be greater than 0",
+            ));
         }
     }
-    
+
     if periods.is_empty() {
-        return Err(actix_web::error::ErrorBadRequest("At least one period must be specified"));
+        return Err(actix_web::error::ErrorBadRequest(
+            "At least one period must be specified",
+        ));
     }
-    
+
     Ok(periods)
 }
-

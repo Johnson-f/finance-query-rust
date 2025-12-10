@@ -1,10 +1,11 @@
-use finance_query_core::client::{scraper, YahooFinanceClient};
-use finance_query_core::client::error::YahooError;
-use finance_query_core::client::FetchClient;
-use finance_query_core::models::{
-    EarningsCallListing, EarningsCallsList, EarningsTranscript, TranscriptParagraph, TranscriptSpeaker,
-};
 use chrono::{DateTime, Utc};
+use finance_query_core::client::FetchClient;
+use finance_query_core::client::error::YahooError;
+use finance_query_core::client::{YahooFinanceClient, scraper};
+use finance_query_core::models::{
+    EarningsCallListing, EarningsCallsList, EarningsTranscript, TranscriptParagraph,
+    TranscriptSpeaker,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,7 +20,11 @@ pub async fn get_earnings_calls_list(
     debug!("Fetching earnings calls list for symbol: {}", symbol);
     let calls_data = match scraper::scrape_earnings_calls_list(fetch_client, symbol).await {
         Ok(data) => {
-            debug!("Scraper returned {} earnings calls for {}", data.len(), symbol);
+            debug!(
+                "Scraper returned {} earnings calls for {}",
+                data.len(),
+                symbol
+            );
             data
         }
         Err(e) => {
@@ -29,7 +34,10 @@ pub async fn get_earnings_calls_list(
     };
 
     if calls_data.is_empty() {
-        warn!("No earnings calls found for {} - scraper returned empty list", symbol);
+        warn!(
+            "No earnings calls found for {} - scraper returned empty list",
+            symbol
+        );
         return Err(YahooError::NotFound(format!(
             "No earnings calls found for {}. The symbol may not have earnings transcripts available, or the page structure may have changed.",
             symbol
@@ -108,16 +116,18 @@ pub async fn get_earnings_transcript(
             .earnings_calls
             .iter()
             .find(|call| {
-                let quarter_match = call.quarter.as_ref().map(|cq| cq == &normalized_quarter).unwrap_or(false);
+                let quarter_match = call
+                    .quarter
+                    .as_ref()
+                    .map(|cq| cq == &normalized_quarter)
+                    .unwrap_or(false);
                 let year_match = call.year == Some(y);
                 quarter_match && year_match
             })
             .ok_or_else(|| {
                 YahooError::ParseError(format!(
                     "No earnings call found for {} {} {}",
-                    symbol,
-                    normalized_quarter,
-                    y
+                    symbol, normalized_quarter, y
                 ))
             })?
     } else {
@@ -127,7 +137,8 @@ pub async fn get_earnings_transcript(
 
     // Scrape the transcript from the URL
     debug!("Scraping transcript from URL: {}", target_call.url);
-    let transcript_data = scraper::scrape_earnings_transcript_from_url(fetch_client, &target_call.url).await?;
+    let transcript_data =
+        scraper::scrape_earnings_transcript_from_url(fetch_client, &target_call.url).await?;
 
     // Parse the transcript
     parse_transcript(symbol, &transcript_data, target_call)
@@ -138,21 +149,24 @@ fn parse_transcript(
     transcript_data: &Value,
     call_info: &EarningsCallListing,
 ) -> Result<EarningsTranscript, YahooError> {
-    let content = transcript_data
-        .get("transcriptContent")
-        .ok_or_else(|| YahooError::ParseError("Missing transcriptContent in response".to_string()))?;
-    let metadata = transcript_data
-        .get("transcriptMetadata")
-        .ok_or_else(|| YahooError::ParseError("Missing transcriptMetadata in response".to_string()))?;
+    let content = transcript_data.get("transcriptContent").ok_or_else(|| {
+        YahooError::ParseError("Missing transcriptContent in response".to_string())
+    })?;
+    let metadata = transcript_data.get("transcriptMetadata").ok_or_else(|| {
+        YahooError::ParseError("Missing transcriptMetadata in response".to_string())
+    })?;
 
     // Parse speaker mapping
     let mut speaker_mapping: HashMap<String, String> = HashMap::new();
     let mut speakers_list: Vec<TranscriptSpeaker> = Vec::new();
 
-    if let Some(speaker_mapping_array) = content.get("speaker_mapping").and_then(|sm| sm.as_array()) {
+    if let Some(speaker_mapping_array) = content.get("speaker_mapping").and_then(|sm| sm.as_array())
+    {
         for speaker_data in speaker_mapping_array {
             if let Some(speaker_id) = speaker_data.get("speaker").and_then(|s| s.as_str()) {
-                let speaker_info = speaker_data.get("speaker_data").and_then(|sd| sd.as_object());
+                let speaker_info = speaker_data
+                    .get("speaker_data")
+                    .and_then(|sd| sd.as_object());
                 let name = speaker_info
                     .and_then(|si| si.get("name"))
                     .and_then(|n| n.as_str())
@@ -168,7 +182,11 @@ fn parse_transcript(
                     .map(|s| s.to_string());
 
                 speaker_mapping.insert(speaker_id.to_string(), name.clone());
-                speakers_list.push(TranscriptSpeaker { name, role, company });
+                speakers_list.push(TranscriptSpeaker {
+                    name,
+                    role,
+                    company,
+                });
             }
         }
     }
@@ -238,9 +256,15 @@ fn parse_transcript(
 
     // Build metadata dict
     let mut meta_dict = HashMap::new();
-    meta_dict.insert("eventId".to_string(), Value::String(call_info.event_id.clone()));
+    meta_dict.insert(
+        "eventId".to_string(),
+        Value::String(call_info.event_id.clone()),
+    );
     meta_dict.insert("fiscalYear".to_string(), Value::Number(fiscal_year.into()));
-    meta_dict.insert("fiscalPeriod".to_string(), Value::String(fiscal_period.clone()));
+    meta_dict.insert(
+        "fiscalPeriod".to_string(),
+        Value::String(fiscal_period.clone()),
+    );
     if let Some(transcript_id) = metadata.get("transcriptId") {
         meta_dict.insert("transcriptId".to_string(), transcript_id.clone());
     }
@@ -256,7 +280,12 @@ fn parse_transcript(
     );
     meta_dict.insert(
         "isLatest".to_string(),
-        Value::Bool(metadata.get("isLatest").and_then(|il| il.as_bool()).unwrap_or(false)),
+        Value::Bool(
+            metadata
+                .get("isLatest")
+                .and_then(|il| il.as_bool())
+                .unwrap_or(false),
+        ),
     );
     meta_dict.insert(
         "retrieved_at".to_string(),

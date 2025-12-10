@@ -1,14 +1,14 @@
 use actix_web::{
+    Error,
     body::BoxBody,
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
-    http::{header::HeaderValue, StatusCode},
-    Error,
+    http::{StatusCode, header::HeaderValue},
 };
-use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
+use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 use std::{
-    future::{ready, Future, Ready},
+    future::{Future, Ready, ready},
     pin::Pin,
     rc::Rc,
     sync::Arc,
@@ -35,23 +35,27 @@ struct RateLimitInfo {
 impl RateLimitManager {
     pub async fn new(redis_url: Option<String>, limit_per_day: Option<u64>) -> Self {
         let limit = limit_per_day.unwrap_or(DEFAULT_RATE_LIMIT_PER_DAY);
-        
+
         let connection = if let Some(url) = redis_url {
             match redis::Client::open(url.as_str()) {
-                Ok(client) => {
-                    match redis::aio::ConnectionManager::new(client).await {
-                        Ok(conn) => {
-                            tracing::info!("Rate limiting using Redis");
-                            Some(Arc::new(conn))
-                        }
-                        Err(e) => {
-                            warn!("Failed to connect to Redis for rate limiting: {}. Rate limiting will be disabled.", e);
-                            None
-                        }
+                Ok(client) => match redis::aio::ConnectionManager::new(client).await {
+                    Ok(conn) => {
+                        tracing::info!("Rate limiting using Redis");
+                        Some(Arc::new(conn))
                     }
-                }
+                    Err(e) => {
+                        warn!(
+                            "Failed to connect to Redis for rate limiting: {}. Rate limiting will be disabled.",
+                            e
+                        );
+                        None
+                    }
+                },
                 Err(e) => {
-                    warn!("Failed to create Redis client for rate limiting: {}. Rate limiting will be disabled.", e);
+                    warn!(
+                        "Failed to create Redis client for rate limiting: {}. Rate limiting will be disabled.",
+                        e
+                    );
                     None
                 }
             }
@@ -103,8 +107,15 @@ impl RateLimitManager {
         // Check if limit exceeded
         if count >= self.limit_per_day {
             // Get TTL to calculate reset time
-            let ttl: i64 = conn.ttl(&key).await.unwrap_or(RATE_LIMIT_TTL_SECONDS as i64);
-            let reset_in = if ttl > 0 { ttl as u64 } else { RATE_LIMIT_TTL_SECONDS };
+            let ttl: i64 = conn
+                .ttl(&key)
+                .await
+                .unwrap_or(RATE_LIMIT_TTL_SECONDS as i64);
+            let reset_in = if ttl > 0 {
+                ttl as u64
+            } else {
+                RATE_LIMIT_TTL_SECONDS
+            };
 
             return Ok(RateLimitResult {
                 allowed: false,
@@ -116,15 +127,16 @@ impl RateLimitManager {
 
         // Increment count
         let new_count = count + 1;
-        match conn.set_ex::<_, _, ()>(&key, new_count, RATE_LIMIT_TTL_SECONDS).await {
-            Ok(_) => {
-                Ok(RateLimitResult {
-                    allowed: true,
-                    count: new_count,
-                    remaining: self.limit_per_day.saturating_sub(new_count),
-                    reset_in: RATE_LIMIT_TTL_SECONDS,
-                })
-            }
+        match conn
+            .set_ex::<_, _, ()>(&key, new_count, RATE_LIMIT_TTL_SECONDS)
+            .await
+        {
+            Ok(_) => Ok(RateLimitResult {
+                allowed: true,
+                count: new_count,
+                remaining: self.limit_per_day.saturating_sub(new_count),
+                reset_in: RATE_LIMIT_TTL_SECONDS,
+            }),
             Err(e) => {
                 error!("Redis error setting rate limit for {}: {}", ip, e);
                 // On Redis error, allow the request (graceful degradation)
@@ -162,9 +174,7 @@ pub struct RateLimitMiddleware {
 
 impl RateLimitMiddleware {
     pub fn new(rate_limit_manager: Arc<RateLimitManager>) -> Self {
-        Self {
-            rate_limit_manager,
-        }
+        Self { rate_limit_manager }
     }
 }
 
@@ -210,9 +220,7 @@ where
         let path = req.path();
         if path == "/ping" || path == "/health" {
             let fut = self.service.call(req);
-            return Box::pin(async move {
-                fut.await.map(|res| res.map_into_boxed_body())
-            });
+            return Box::pin(async move { fut.await.map(|res| res.map_into_boxed_body()) });
         }
 
         // Extract client IP before moving req
@@ -223,7 +231,7 @@ where
         Box::pin(async move {
             // Check rate limit first (before processing request)
             let rate_limit_result = rate_limit_manager.check_and_increment(&ip).await;
-            
+
             match rate_limit_result {
                 Ok(result) => {
                     if !result.allowed {
@@ -250,20 +258,16 @@ where
                     // Add rate limit headers
                     res.headers_mut().insert(
                         actix_web::http::header::HeaderName::from_static("x-ratelimit-limit"),
-                        HeaderValue::from_str(
-                            &rate_limit_manager.limit_per_day().to_string(),
-                        )
-                        .unwrap(),
+                        HeaderValue::from_str(&rate_limit_manager.limit_per_day().to_string())
+                            .unwrap(),
                     );
                     res.headers_mut().insert(
                         actix_web::http::header::HeaderName::from_static("x-ratelimit-remaining"),
-                        HeaderValue::from_str(&result.remaining.to_string())
-                            .unwrap(),
+                        HeaderValue::from_str(&result.remaining.to_string()).unwrap(),
                     );
                     res.headers_mut().insert(
                         actix_web::http::header::HeaderName::from_static("x-ratelimit-reset"),
-                        HeaderValue::from_str(&result.reset_in.to_string())
-                            .unwrap(),
+                        HeaderValue::from_str(&result.reset_in.to_string()).unwrap(),
                     );
 
                     Ok(res)

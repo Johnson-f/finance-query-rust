@@ -1,29 +1,26 @@
-use finance_query_core::client::error::YahooError;
 use finance_query_core::client::FetchClient;
+use finance_query_core::client::error::YahooError;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
-use url::Url;
-
-const LOGO_DEV_TOKEN: &str = "pk_Xd1Cdye3QYmCOXzcvxhxyw";
 const LOGO_TIMEOUT_SECONDS: u64 = 1;
 
-/// Fetches a company logo URL from logo.dev API.
-/// 
-/// Tries to fetch by ticker symbol first, then falls back to domain-based lookup.
-/// Returns None if logo fetching is disabled, fails, or times out.
-/// 
+/// Fetches a company logo URL from Financial Modeling Prep's image-stock endpoint.
+///
+/// Uses the provided ticker symbol to build the logo URL. Returns None if logo
+/// fetching is disabled, fails, or times out.
+///
 /// # Arguments
 /// * `fetch_client` - The HTTP client to use for fetching
 /// * `symbol` - Optional stock ticker symbol (e.g., "AAPL")
-/// * `website_url` - Optional company website URL (e.g., "https://www.apple.com")
-/// 
+/// * `website_url` - Unused; retained for backward compatibility
+///
 /// # Returns
 /// * `Option<String>` - The logo URL if successful, None otherwise
 pub async fn get_logo(
     fetch_client: &Arc<FetchClient>,
     symbol: Option<&str>,
-    website_url: Option<&str>,
+    _website_url: Option<&str>,
 ) -> Option<String> {
     // Check if logo fetching is disabled
     if std::env::var("DISABLE_LOGO_FETCHING")
@@ -42,13 +39,13 @@ pub async fn get_logo(
         .unwrap_or(LOGO_TIMEOUT_SECONDS);
     let timeout = Duration::from_secs(timeout_secs);
 
-    // Try fetching by ticker symbol first
+    // Try fetching by ticker symbol
     if let Some(sym) = symbol {
         let ticker_url = format!(
-            "https://img.logo.dev/ticker/{}?token={}&retina=true",
-            sym, LOGO_DEV_TOKEN
+            "https://financialmodelingprep.com/image-stock/{}.png",
+            sym.to_uppercase()
         );
-        
+
         match tokio::time::timeout(timeout, fetch_logo_url(fetch_client, &ticker_url)).await {
             Ok(Ok(Some(logo_url))) => {
                 debug!("Successfully fetched logo for symbol {}: {}", sym, logo_url);
@@ -61,36 +58,10 @@ pub async fn get_logo(
                 debug!("Logo fetch failed for symbol {}: {}", sym, e);
             }
             Err(_) => {
-                warn!("Logo fetch timeout for symbol {} after {}s", sym, timeout_secs);
-            }
-        }
-    }
-
-    // Fall back to domain-based lookup if website URL is provided
-    if let Some(url_str) = website_url
-        && let Ok(parsed_url) = Url::parse(url_str)
-        && let Some(domain) = parsed_url.domain()
-    {
-        // Remove www. prefix if present
-        let domain = domain.strip_prefix("www.").unwrap_or(domain);
-        let domain_url = format!(
-            "https://img.logo.dev/{}?token={}&retina=true",
-            domain, LOGO_DEV_TOKEN
-        );
-
-        match tokio::time::timeout(timeout, fetch_logo_url(fetch_client, &domain_url)).await {
-            Ok(Ok(Some(logo_url))) => {
-                debug!("Successfully fetched logo for domain {}: {}", domain, logo_url);
-                return Some(logo_url);
-            }
-            Ok(Ok(None)) => {
-                debug!("Logo fetch returned None for domain {}", domain);
-            }
-            Ok(Err(e)) => {
-                debug!("Logo fetch failed for domain {}: {}", domain, e);
-            }
-            Err(_) => {
-                warn!("Logo fetch timeout for domain {} after {}s", domain, timeout_secs);
+                warn!(
+                    "Logo fetch timeout for symbol {} after {}s",
+                    sym, timeout_secs
+                );
             }
         }
     }
@@ -98,16 +69,16 @@ pub async fn get_logo(
     None
 }
 
-/// Fetches a logo URL from logo.dev and returns the final URL.
-/// 
-/// The logo.dev API redirects to the actual logo image URL, so we need to
-/// follow the redirect and return the final URL.
+/// Fetches a logo URL and returns the final URL.
+///
+/// The Financial Modeling Prep endpoint returns the actual logo image URL, so
+/// we simply check for success and return the final URL.
 async fn fetch_logo_url(
     fetch_client: &Arc<FetchClient>,
     url: &str,
 ) -> Result<Option<String>, YahooError> {
     let response = fetch_client.fetch_response(url).await?;
-    
+
     let status = response.status();
     if status.is_success() {
         // Get the final URL after redirects
@@ -118,4 +89,3 @@ async fn fetch_logo_url(
         Ok(None)
     }
 }
-

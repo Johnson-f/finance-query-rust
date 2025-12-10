@@ -1,20 +1,19 @@
 use async_graphql::*;
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use finance_query_core::models::analysts::{
-    RecommendationData as RecommendationDataModel,
-    UpgradeDowngrade as UpgradeDowngradeModel,
-    PriceTarget as PriceTargetModel,
     EarningsEstimate as EarningsEstimateModel,
-    RevenueEstimate as RevenueEstimateModel,
-    EarningsHistoryItem as EarningsHistoryItemModel,
-    RecommendationsResponse as RecommendationsResponseModel,
-    UpgradesDowngradesResponse as UpgradesDowngradesResponseModel,
-    PriceTargetsResponse as PriceTargetsResponseModel,
     EarningsEstimateResponse as EarningsEstimateResponseModel,
+    EarningsHistoryItem as EarningsHistoryItemModel,
+    EarningsHistoryResponse as EarningsHistoryResponseModel, PriceTarget as PriceTargetModel,
+    PriceTargetsResponse as PriceTargetsResponseModel,
+    RecommendationData as RecommendationDataModel,
+    RecommendationsResponse as RecommendationsResponseModel,
+    RevenueEstimate as RevenueEstimateModel,
     RevenueEstimateResponse as RevenueEstimateResponseModel,
-    EarningsHistoryResponse as EarningsHistoryResponseModel,
+    UpgradeDowngrade as UpgradeDowngradeModel,
+    UpgradesDowngradesResponse as UpgradesDowngradesResponseModel,
 };
+use std::collections::HashMap;
 
 #[derive(SimpleObject, Clone)]
 pub struct RecommendationData {
@@ -93,7 +92,9 @@ pub struct EarningsEstimate {
 impl From<EarningsEstimateModel> for EarningsEstimate {
     fn from(estimate: EarningsEstimateModel) -> Self {
         EarningsEstimate {
-            estimates: estimate.estimates.into_iter()
+            estimates: estimate
+                .estimates
+                .into_iter()
                 .map(|(k, v)| (k, async_graphql::Json(v)))
                 .collect(),
         }
@@ -108,7 +109,9 @@ pub struct RevenueEstimate {
 impl From<RevenueEstimateModel> for RevenueEstimate {
     fn from(estimate: RevenueEstimateModel) -> Self {
         RevenueEstimate {
-            estimates: estimate.estimates.into_iter()
+            estimates: estimate
+                .estimates
+                .into_iter()
                 .map(|(k, v)| (k, async_graphql::Json(v)))
                 .collect(),
         }
@@ -149,7 +152,11 @@ impl From<RecommendationsResponseModel> for RecommendationsResponse {
     fn from(response: RecommendationsResponseModel) -> Self {
         RecommendationsResponse {
             symbol: response.symbol,
-            recommendations: response.recommendations.into_iter().map(RecommendationData::from).collect(),
+            recommendations: response
+                .recommendations
+                .into_iter()
+                .map(RecommendationData::from)
+                .collect(),
         }
     }
 }
@@ -165,7 +172,11 @@ impl From<UpgradesDowngradesResponseModel> for UpgradesDowngradesResponse {
     fn from(response: UpgradesDowngradesResponseModel) -> Self {
         UpgradesDowngradesResponse {
             symbol: response.symbol,
-            upgrades_downgrades: response.upgrades_downgrades.into_iter().map(UpgradeDowngrade::from).collect(),
+            upgrades_downgrades: response
+                .upgrades_downgrades
+                .into_iter()
+                .map(UpgradeDowngrade::from)
+                .collect(),
         }
     }
 }
@@ -229,7 +240,11 @@ impl From<EarningsHistoryResponseModel> for EarningsHistoryResponse {
     fn from(response: EarningsHistoryResponseModel) -> Self {
         EarningsHistoryResponse {
             symbol: response.symbol,
-            earnings_history: response.earnings_history.into_iter().map(EarningsHistoryItem::from).collect(),
+            earnings_history: response
+                .earnings_history
+                .into_iter()
+                .map(EarningsHistoryItem::from)
+                .collect(),
         }
     }
 }

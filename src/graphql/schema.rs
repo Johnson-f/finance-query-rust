@@ -1,22 +1,26 @@
-use async_graphql::*;
-use actix_web::web;
 use crate::AppState;
 use crate::graphql::types::*;
-use finance_query_core::models::historical::{TimeRange as TimeRangeModel, Interval as IntervalModel, IndicatorType as IndicatorTypeModel};
-use finance_query_core::models::holders::HolderType;
-use finance_query_core::models::analysts::AnalysisType;
-use finance_query_core::models::financials::{StatementType as StatementTypeModel, Frequency as FrequencyModel};
 use crate::service::historical::calculate_indicators;
 use crate::service::market::MarketSchedule;
 use crate::service::websocket::indicator::moving_average::{MovingAverageType, calculate_ma};
-use std::collections::HashSet;
-use tokio_stream::{wrappers::IntervalStream, StreamExt};
-use futures_util::Stream;
-use tokio::time::{interval, Duration};
-use std::sync::Arc;
-use chrono::Utc;
-use tracing::error;
+use actix_web::web;
+use async_graphql::*;
 use async_stream::stream;
+use chrono::Utc;
+use finance_query_core::models::analysts::AnalysisType;
+use finance_query_core::models::financials::{
+    Frequency as FrequencyModel, StatementType as StatementTypeModel,
+};
+use finance_query_core::models::historical::{
+    IndicatorType as IndicatorTypeModel, Interval as IntervalModel, TimeRange as TimeRangeModel,
+};
+use finance_query_core::models::holders::HolderType;
+use futures_util::Stream;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tokio::time::{Duration, interval};
+use tokio_stream::{StreamExt, wrappers::IntervalStream};
+use tracing::error;
 
 pub struct AppContext {
     pub app_state: web::Data<AppState>,
@@ -27,11 +31,7 @@ pub struct Query;
 #[Object]
 impl Query {
     // Quote endpoints
-    async fn quotes(
-        &self,
-        ctx: &Context<'_>,
-        symbols: Vec<String>,
-    ) -> Result<Vec<Quote>> {
+    async fn quotes(&self, ctx: &Context<'_>, symbols: Vec<String>) -> Result<Vec<Quote>> {
         let context = ctx.data::<AppContext>()?;
         let symbol_refs: Vec<&str> = symbols.iter().map(|s| s.as_str()).collect();
         let quotes = crate::service::get_quotes(
@@ -75,7 +75,8 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        Ok(quotes.into_iter()
+        Ok(quotes
+            .into_iter()
             .map(finance_query_core::models::quote::DetailedQuote::from)
             .map(DetailedQuote::from)
             .collect())
@@ -112,18 +113,17 @@ impl Query {
         period: Option<String>,
     ) -> Result<HistoricalResponse> {
         let context = ctx.data::<AppContext>()?;
-        
+
         // Parse time range
-        let time_range = parse_time_range(&range)
-            .map_err(|_| Error::new("Invalid time range"))?;
-        
+        let time_range = parse_time_range(&range).map_err(|_| Error::new("Invalid time range"))?;
+
         // Parse interval
-        let interval_model = parse_interval(&interval)
-            .map_err(|_| Error::new("Invalid interval"))?;
-        
+        let interval_model =
+            parse_interval(&interval).map_err(|_| Error::new("Invalid interval"))?;
+
         // Validate interval-range compatibility
         validate_interval_range_compatibility(&interval_model, &time_range)?;
-        
+
         // Get historical data
         let mut historical = crate::service::get_historical(
             &context.app_state.yahoo_client,
@@ -133,28 +133,28 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        
+
         // Calculate indicators if requested
         if let Some(indicators_str) = indicators {
             let requested_indicators: HashSet<IndicatorTypeModel> = indicators_str
                 .iter()
                 .filter_map(|s| IndicatorTypeModel::parse(s))
                 .collect();
-            
+
             if requested_indicators.is_empty() {
                 return Err(Error::new("Invalid indicator type. Supported: sma, ema"));
             }
-            
+
             let periods_str = period.as_deref().unwrap_or("20");
             let periods = parse_periods(periods_str)?;
-            
+
             if periods.is_empty() {
                 return Err(Error::new("At least one period must be specified"));
             }
-            
+
             historical = calculate_indicators(historical, &periods, &requested_indicators);
         }
-        
+
         Ok(HistoricalResponse::from(historical))
     }
 
@@ -167,52 +167,33 @@ impl Query {
     ) -> Result<SearchResponse> {
         let context = ctx.data::<AppContext>()?;
         let hits = hits.unwrap_or(6);
-        let results = crate::service::search(
-            &context.app_state.yahoo_client,
-            &query,
-            hits,
-        )
-        .await
-        .map_err(|e| Error::new(e.to_string()))?;
+        let results = crate::service::search(&context.app_state.yahoo_client, &query, hits)
+            .await
+            .map_err(|e| Error::new(e.to_string()))?;
         Ok(SearchResponse::from(results))
     }
 
     // News endpoints
-    async fn news(
-        &self,
-        ctx: &Context<'_>,
-        symbol: Option<String>,
-    ) -> Result<Vec<News>> {
+    async fn news(&self, ctx: &Context<'_>, symbol: Option<String>) -> Result<Vec<News>> {
         let context = ctx.data::<AppContext>()?;
         let news_list = if let Some(symbol) = symbol {
-            crate::service::scrape_news_for_quote(
-                &context.app_state.fetch_client,
-                &symbol,
-            )
-            .await
-            .map_err(|e| Error::new(e.to_string()))?
+            crate::service::scrape_news_for_quote(&context.app_state.fetch_client, &symbol)
+                .await
+                .map_err(|e| Error::new(e.to_string()))?
         } else {
-            crate::service::scrape_general_news(
-                &context.app_state.fetch_client,
-            )
-            .await
-            .map_err(|e| Error::new(e.to_string()))?
+            crate::service::scrape_general_news(&context.app_state.fetch_client)
+                .await
+                .map_err(|e| Error::new(e.to_string()))?
         };
         Ok(news_list.into_iter().map(News::from).collect())
     }
 
-    async fn news_by_symbol(
-        &self,
-        ctx: &Context<'_>,
-        symbol: String,
-    ) -> Result<Vec<News>> {
+    async fn news_by_symbol(&self, ctx: &Context<'_>, symbol: String) -> Result<Vec<News>> {
         let context = ctx.data::<AppContext>()?;
-        let news_list = crate::service::scrape_news_for_quote(
-            &context.app_state.fetch_client,
-            &symbol,
-        )
-        .await
-        .map_err(|e| Error::new(e.to_string()))?;
+        let news_list =
+            crate::service::scrape_news_for_quote(&context.app_state.fetch_client, &symbol)
+                .await
+                .map_err(|e| Error::new(e.to_string()))?;
         Ok(news_list.into_iter().map(News::from).collect())
     }
 
@@ -247,11 +228,7 @@ impl Query {
     }
 
     // Earnings endpoints
-    async fn earnings_calls(
-        &self,
-        ctx: &Context<'_>,
-        symbol: String,
-    ) -> Result<EarningsCallsList> {
+    async fn earnings_calls(&self, ctx: &Context<'_>, symbol: String) -> Result<EarningsCallsList> {
         let context = ctx.data::<AppContext>()?;
         let calls = crate::service::get_earnings_calls_list(
             &context.app_state.yahoo_client,
@@ -287,36 +264,29 @@ impl Query {
     async fn actives(&self, ctx: &Context<'_>) -> Result<Vec<MarketMover>> {
         let context = ctx.data::<AppContext>()?;
         use finance_query_core::models::movers::MoverCount;
-        let movers = crate::service::get_actives(
-            &context.app_state.yahoo_client,
-            MoverCount::Fifty,
-        )
-        .await
-        .map_err(|e| Error::new(e.to_string()))?;
+        let movers =
+            crate::service::get_actives(&context.app_state.yahoo_client, MoverCount::Fifty)
+                .await
+                .map_err(|e| Error::new(e.to_string()))?;
         Ok(movers.into_iter().map(MarketMover::from).collect())
     }
 
     async fn gainers(&self, ctx: &Context<'_>) -> Result<Vec<MarketMover>> {
         let context = ctx.data::<AppContext>()?;
         use finance_query_core::models::movers::MoverCount;
-        let movers = crate::service::get_gainers(
-            &context.app_state.yahoo_client,
-            MoverCount::Fifty,
-        )
-        .await
-        .map_err(|e| Error::new(e.to_string()))?;
+        let movers =
+            crate::service::get_gainers(&context.app_state.yahoo_client, MoverCount::Fifty)
+                .await
+                .map_err(|e| Error::new(e.to_string()))?;
         Ok(movers.into_iter().map(MarketMover::from).collect())
     }
 
     async fn losers(&self, ctx: &Context<'_>) -> Result<Vec<MarketMover>> {
         let context = ctx.data::<AppContext>()?;
         use finance_query_core::models::movers::MoverCount;
-        let movers = crate::service::get_losers(
-            &context.app_state.yahoo_client,
-            MoverCount::Fifty,
-        )
-        .await
-        .map_err(|e| Error::new(e.to_string()))?;
+        let movers = crate::service::get_losers(&context.app_state.yahoo_client, MoverCount::Fifty)
+            .await
+            .map_err(|e| Error::new(e.to_string()))?;
         Ok(movers.into_iter().map(MarketMover::from).collect())
     }
 
@@ -351,8 +321,9 @@ impl Query {
         Ok(MajorHoldersResponse {
             symbol: holders_data.symbol,
             breakdown: MajorHoldersBreakdown::from(
-                holders_data.major_breakdown
-                    .ok_or_else(|| Error::new("No major breakdown data"))?
+                holders_data
+                    .major_breakdown
+                    .ok_or_else(|| Error::new("No major breakdown data"))?,
             ),
         })
     }
@@ -372,7 +343,8 @@ impl Query {
         .map_err(|e| Error::new(e.to_string()))?;
         Ok(InstitutionalHoldersResponse {
             symbol: holders_data.symbol,
-            holders: holders_data.institutional_holders
+            holders: holders_data
+                .institutional_holders
                 .ok_or_else(|| Error::new("No institutional holders data"))?
                 .into_iter()
                 .map(InstitutionalHolder::from)
@@ -395,7 +367,8 @@ impl Query {
         .map_err(|e| Error::new(e.to_string()))?;
         Ok(MutualFundHoldersResponse {
             symbol: holders_data.symbol,
-            holders: holders_data.mutualfund_holders
+            holders: holders_data
+                .mutualfund_holders
                 .ok_or_else(|| Error::new("No mutual fund holders data"))?
                 .into_iter()
                 .map(MutualFundHolder::from)
@@ -418,7 +391,8 @@ impl Query {
         .map_err(|e| Error::new(e.to_string()))?;
         Ok(InsiderTransactionsResponse {
             symbol: holders_data.symbol,
-            transactions: holders_data.insider_transactions
+            transactions: holders_data
+                .insider_transactions
                 .ok_or_else(|| Error::new("No insider transactions data"))?
                 .into_iter()
                 .map(InsiderTransaction::from)
@@ -442,8 +416,9 @@ impl Query {
         Ok(InsiderPurchasesResponse {
             symbol: holders_data.symbol,
             summary: InsiderPurchase::from(
-                holders_data.insider_purchases
-                    .ok_or_else(|| Error::new("No insider purchases data"))?
+                holders_data
+                    .insider_purchases
+                    .ok_or_else(|| Error::new("No insider purchases data"))?,
             ),
         })
     }
@@ -463,7 +438,8 @@ impl Query {
         .map_err(|e| Error::new(e.to_string()))?;
         Ok(InsiderRosterResponse {
             symbol: holders_data.symbol,
-            roster: holders_data.insider_roster
+            roster: holders_data
+                .insider_roster
                 .ok_or_else(|| Error::new("No insider roster data"))?
                 .into_iter()
                 .map(InsiderRosterMember::from)
@@ -485,17 +461,23 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let recommendations: Vec<finance_query_core::models::analysts::RecommendationData> = 
-            serde_json::from_value(data.get("recommendations")
-                .ok_or_else(|| Error::new("No recommendations data"))?
-                .clone())
+        let recommendations: Vec<finance_query_core::models::analysts::RecommendationData> =
+            serde_json::from_value(
+                data.get("recommendations")
+                    .ok_or_else(|| Error::new("No recommendations data"))?
+                    .clone(),
+            )
             .map_err(|e| Error::new(format!("Failed to parse recommendations: {}", e)))?;
         Ok(RecommendationsResponse {
-            symbol: data.get("symbol")
+            symbol: data
+                .get("symbol")
                 .and_then(|s| s.as_str())
                 .unwrap_or(&symbol)
                 .to_string(),
-            recommendations: recommendations.into_iter().map(RecommendationData::from).collect(),
+            recommendations: recommendations
+                .into_iter()
+                .map(RecommendationData::from)
+                .collect(),
         })
     }
 
@@ -512,17 +494,23 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let upgrades_downgrades: Vec<finance_query_core::models::analysts::UpgradeDowngrade> = 
-            serde_json::from_value(data.get("upgrades_downgrades")
-                .ok_or_else(|| Error::new("No upgrades_downgrades data"))?
-                .clone())
+        let upgrades_downgrades: Vec<finance_query_core::models::analysts::UpgradeDowngrade> =
+            serde_json::from_value(
+                data.get("upgrades_downgrades")
+                    .ok_or_else(|| Error::new("No upgrades_downgrades data"))?
+                    .clone(),
+            )
             .map_err(|e| Error::new(format!("Failed to parse upgrades_downgrades: {}", e)))?;
         Ok(UpgradesDowngradesResponse {
-            symbol: data.get("symbol")
+            symbol: data
+                .get("symbol")
                 .and_then(|s| s.as_str())
                 .unwrap_or(&symbol)
                 .to_string(),
-            upgrades_downgrades: upgrades_downgrades.into_iter().map(UpgradeDowngrade::from).collect(),
+            upgrades_downgrades: upgrades_downgrades
+                .into_iter()
+                .map(UpgradeDowngrade::from)
+                .collect(),
         })
     }
 
@@ -539,13 +527,16 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let price_targets: finance_query_core::models::analysts::PriceTarget = 
-            serde_json::from_value(data.get("price_targets")
-                .ok_or_else(|| Error::new("No price_targets data"))?
-                .clone())
+        let price_targets: finance_query_core::models::analysts::PriceTarget =
+            serde_json::from_value(
+                data.get("price_targets")
+                    .ok_or_else(|| Error::new("No price_targets data"))?
+                    .clone(),
+            )
             .map_err(|e| Error::new(format!("Failed to parse price_targets: {}", e)))?;
         Ok(PriceTargetsResponse {
-            symbol: data.get("symbol")
+            symbol: data
+                .get("symbol")
                 .and_then(|s| s.as_str())
                 .unwrap_or(&symbol)
                 .to_string(),
@@ -566,13 +557,16 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let earnings_estimate: finance_query_core::models::analysts::EarningsEstimate = 
-            serde_json::from_value(data.get("earnings_estimate")
-                .ok_or_else(|| Error::new("No earnings_estimate data"))?
-                .clone())
+        let earnings_estimate: finance_query_core::models::analysts::EarningsEstimate =
+            serde_json::from_value(
+                data.get("earnings_estimate")
+                    .ok_or_else(|| Error::new("No earnings_estimate data"))?
+                    .clone(),
+            )
             .map_err(|e| Error::new(format!("Failed to parse earnings_estimate: {}", e)))?;
         Ok(EarningsEstimateResponse {
-            symbol: data.get("symbol")
+            symbol: data
+                .get("symbol")
                 .and_then(|s| s.as_str())
                 .unwrap_or(&symbol)
                 .to_string(),
@@ -593,13 +587,16 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let revenue_estimate: finance_query_core::models::analysts::RevenueEstimate = 
-            serde_json::from_value(data.get("revenue_estimate")
-                .ok_or_else(|| Error::new("No revenue_estimate data"))?
-                .clone())
+        let revenue_estimate: finance_query_core::models::analysts::RevenueEstimate =
+            serde_json::from_value(
+                data.get("revenue_estimate")
+                    .ok_or_else(|| Error::new("No revenue_estimate data"))?
+                    .clone(),
+            )
             .map_err(|e| Error::new(format!("Failed to parse revenue_estimate: {}", e)))?;
         Ok(RevenueEstimateResponse {
-            symbol: data.get("symbol")
+            symbol: data
+                .get("symbol")
                 .and_then(|s| s.as_str())
                 .unwrap_or(&symbol)
                 .to_string(),
@@ -620,36 +617,36 @@ impl Query {
         )
         .await
         .map_err(|e| Error::new(e.to_string()))?;
-        let earnings_history: Vec<finance_query_core::models::analysts::EarningsHistoryItem> = 
-            serde_json::from_value(data.get("earnings_history")
-                .ok_or_else(|| Error::new("No earnings_history data"))?
-                .clone())
+        let earnings_history: Vec<finance_query_core::models::analysts::EarningsHistoryItem> =
+            serde_json::from_value(
+                data.get("earnings_history")
+                    .ok_or_else(|| Error::new("No earnings_history data"))?
+                    .clone(),
+            )
             .map_err(|e| Error::new(format!("Failed to parse earnings_history: {}", e)))?;
         Ok(EarningsHistoryResponse {
-            symbol: data.get("symbol")
+            symbol: data
+                .get("symbol")
                 .and_then(|s| s.as_str())
                 .unwrap_or(&symbol)
                 .to_string(),
-            earnings_history: earnings_history.into_iter().map(EarningsHistoryItem::from).collect(),
+            earnings_history: earnings_history
+                .into_iter()
+                .map(EarningsHistoryItem::from)
+                .collect(),
         })
     }
 
     // Sectors endpoints
     async fn sectors(&self, ctx: &Context<'_>) -> Result<Vec<MarketSector>> {
         let context = ctx.data::<AppContext>()?;
-        let sectors = crate::service::get_sectors(
-            &context.app_state.fetch_client,
-        )
-        .await
-        .map_err(|e| Error::new(e.to_string()))?;
+        let sectors = crate::service::get_sectors(&context.app_state.fetch_client)
+            .await
+            .map_err(|e| Error::new(e.to_string()))?;
         Ok(sectors.into_iter().map(MarketSector::from).collect())
     }
 
-    async fn sector_for_symbol(
-        &self,
-        ctx: &Context<'_>,
-        symbol: String,
-    ) -> Result<MarketSector> {
+    async fn sector_for_symbol(&self, ctx: &Context<'_>, symbol: String) -> Result<MarketSector> {
         let context = ctx.data::<AppContext>()?;
         let sector = crate::service::get_sector_for_symbol(
             &context.app_state.yahoo_client,
@@ -669,14 +666,12 @@ impl Query {
         let context = ctx.data::<AppContext>()?;
         use finance_query_core::models::sectors::Sector;
         use std::str::FromStr;
-        let sector_enum = Sector::from_str(&sector)
-            .map_err(|e| Error::new(format!("Invalid sector: {}", e)))?;
-        let details = crate::service::get_sector_details(
-            &context.app_state.fetch_client,
-            sector_enum,
-        )
-        .await
-        .map_err(|e| Error::new(e.to_string()))?;
+        let sector_enum =
+            Sector::from_str(&sector).map_err(|e| Error::new(format!("Invalid sector: {}", e)))?;
+        let details =
+            crate::service::get_sector_details(&context.app_state.fetch_client, sector_enum)
+                .await
+                .map_err(|e| Error::new(e.to_string()))?;
         Ok(MarketSectorDetails::from(details))
     }
 
@@ -709,39 +704,40 @@ impl Subscription {
     ) -> impl Stream<Item = Result<ProfileUpdate>> {
         let context = ctx.data::<AppContext>().ok();
         let symbol_upper = symbol.to_uppercase();
-        
+
         let interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         interval_stream.then(move |_| {
             let context_clone = context;
             let symbol_clone = symbol_upper.clone();
-            
+
             async move {
                 if let Some(ctx) = &context_clone {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();
                     let sym = symbol_clone.clone();
-                    
+
                     let symbols = vec![sym.as_str()];
                     let quotes_task = crate::service::get_quotes(&yahoo, &fetch, &symbols);
                     let similar_task = crate::service::get_similar_quotes(&yahoo, &fetch, &sym, 10);
                     let sector_task = crate::service::get_sector_for_symbol(&yahoo, &fetch, &sym);
                     let news_task = crate::service::scrape_news_for_quote(&fetch, &sym);
-                    
-                    let (quotes_result, similar_result, sector_result, news_result) = tokio::join!(
-                        quotes_task,
-                        similar_task,
-                        sector_task,
-                        news_task
-                    );
-                    
-                    let quote = quotes_result.ok()
+
+                    let (quotes_result, similar_result, sector_result, news_result) =
+                        tokio::join!(quotes_task, similar_task, sector_task, news_task);
+
+                    let quote = quotes_result
+                        .ok()
                         .and_then(|q| q.first().cloned())
                         .map(Quote::from);
-                    let similar = similar_result.ok().map(|s| s.into_iter().map(SimpleQuote::from).collect());
+                    let similar = similar_result
+                        .ok()
+                        .map(|s| s.into_iter().map(SimpleQuote::from).collect());
                     let sector = sector_result.ok().map(MarketSector::from);
-                    let news = news_result.ok().map(|n| n.into_iter().map(News::from).collect());
-                    
+                    let news = news_result
+                        .ok()
+                        .map(|n| n.into_iter().map(News::from).collect());
+
                     Ok(ProfileUpdate {
                         quote,
                         similar,
@@ -763,16 +759,16 @@ impl Subscription {
     ) -> impl Stream<Item = Result<SimpleQuote>> {
         let context = ctx.data::<AppContext>().ok();
         let symbol_refs: Vec<String> = symbols.iter().map(|s| s.to_uppercase()).collect();
-        
+
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         stream! {
             while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();
                     let symbols_clone: Vec<&str> = symbol_refs.iter().map(|s| s.as_str()).collect();
-                    
+
                     match crate::service::get_simple_quotes(&yahoo, &fetch, &symbols_clone).await {
                         Ok(quotes) => {
                             for quote in quotes {
@@ -793,23 +789,20 @@ impl Subscription {
     }
 
     /// Subscribe to market indices updates
-    async fn indices_updates(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = Result<MarketIndex>> {
+    async fn indices_updates(&self, ctx: &Context<'_>) -> impl Stream<Item = Result<MarketIndex>> {
         let context = ctx.data::<AppContext>().ok();
-        
+
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         stream! {
             while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();
-                    
+
                     use finance_query_core::models::indices::Index;
                     let indices_to_fetch = vec![Index::Dji, Index::Ixic, Index::Gspc];
-                    
+
                     match crate::service::get_indices(&yahoo, &fetch, Some(indices_to_fetch), None).await {
                         Ok(indices) => {
                             for index in indices {
@@ -830,19 +823,16 @@ impl Subscription {
     }
 
     /// Subscribe to general market news updates
-    async fn news_updates(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = Result<News>> {
+    async fn news_updates(&self, ctx: &Context<'_>) -> impl Stream<Item = Result<News>> {
         let context = ctx.data::<AppContext>().ok();
-        
+
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         stream! {
             while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let fetch = ctx.app_state.fetch_client.clone();
-                    
+
                     match crate::service::scrape_general_news(&fetch).await {
                         Ok(news_list) => {
                             for news_item in news_list {
@@ -863,19 +853,16 @@ impl Subscription {
     }
 
     /// Subscribe to sector performance updates
-    async fn sectors_updates(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = Result<MarketSector>> {
+    async fn sectors_updates(&self, ctx: &Context<'_>) -> impl Stream<Item = Result<MarketSector>> {
         let context = ctx.data::<AppContext>().ok();
-        
+
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         stream! {
             while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let fetch = ctx.app_state.fetch_client.clone();
-                    
+
                     match crate::service::get_sectors(&fetch).await {
                         Ok(sectors) => {
                             for sector in sectors {
@@ -896,48 +883,45 @@ impl Subscription {
     }
 
     /// Subscribe to market movers updates (actives, gainers, losers)
-    async fn movers_updates(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = Result<MoversUpdate>> {
+    async fn movers_updates(&self, ctx: &Context<'_>) -> impl Stream<Item = Result<MoversUpdate>> {
         let context = ctx.data::<AppContext>().ok();
-        
+
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         stream! {
             while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
-                    
+
                     use finance_query_core::models::movers::MoverCount;
                     let actives_task = crate::service::get_actives(&yahoo, MoverCount::Fifty);
                     let gainers_task = crate::service::get_gainers(&yahoo, MoverCount::Fifty);
                     let losers_task = crate::service::get_losers(&yahoo, MoverCount::Fifty);
-                    
+
                     let (actives_result, gainers_result, losers_result) = tokio::join!(
                         actives_task,
                         gainers_task,
                         losers_task
                     );
-                    
+
                     // Filter to US-only stocks (symbols without dots or with US exchange suffixes)
                     let filter_us = |movers: Vec<finance_query_core::models::movers::MarketMover>| -> Vec<MarketMover> {
                         movers.into_iter()
                             .filter(|m| {
                                 let symbol = &m.symbol;
-                                !symbol.contains('.') || 
-                                symbol.ends_with(".OB") || 
+                                !symbol.contains('.') ||
+                                symbol.ends_with(".OB") ||
                                 symbol.ends_with(".PK") ||
                                 symbol.ends_with(".OTC")
                             })
                             .map(MarketMover::from)
                             .collect()
                     };
-                    
+
                     let actives = actives_result.ok().map(filter_us);
                     let gainers = gainers_result.ok().map(filter_us);
                     let losers = losers_result.ok().map(filter_us);
-                    
+
                     yield Ok(MoversUpdate {
                         actives,
                         gainers,
@@ -957,9 +941,9 @@ impl Subscription {
         _ctx: &Context<'_>,
     ) -> impl Stream<Item = Result<MarketHours>> {
         let market_schedule = Arc::new(MarketSchedule::new());
-        
+
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         stream! {
             while (interval_stream.next().await).is_some() {
                 let (status, reason) = market_schedule.get_market_status();
@@ -988,9 +972,9 @@ impl Subscription {
             "ema" => Ok(MovingAverageType::EMA),
             _ => Err(Error::new("Invalid indicator type. Must be 'sma' or 'ema'")),
         };
-        
+
         let mut interval_stream = IntervalStream::new(interval(Duration::from_secs(5)));
-        
+
         stream! {
             let ma_type = match ma_type_result {
                 Ok(ma) => ma,
@@ -999,28 +983,28 @@ impl Subscription {
                     return;
                 }
             };
-            
+
             while (interval_stream.next().await).is_some() {
                 if let Some(ctx) = &context {
                     let yahoo = ctx.app_state.yahoo_client.clone();
                     let fetch = ctx.app_state.fetch_client.clone();
                     let price_buffer = ctx.app_state.price_buffer_manager.clone();
                     let sym = symbol_upper.clone();
-                    
+
                     // Get current price
                     let symbol_refs = vec![sym.as_str()];
                     let price_result = crate::service::get_simple_quotes(&yahoo, &fetch, &symbol_refs).await;
-                    
+
                     if let Ok(quotes) = price_result {
                         if let Some(quote) = quotes.first() {
                             // Parse price
                             if let Ok(price) = quote.price.parse::<f64>() {
                                 // Add to price buffer (real-time, not daily/weekly)
                                 price_buffer.add_price(&sym, price, false, false).await;
-                                
+
                                 // Get price history from buffer
                                 let prices = price_buffer.get_prices(&sym).await;
-                                
+
                                 if prices.len() >= period_usize {
                                     // Calculate moving average
                                     if let Some(ma_value) = calculate_ma(&prices, ma_type, period_usize) {
@@ -1116,7 +1100,7 @@ fn validate_interval_range_compatibility(
 
     if restricted_minute_intervals {
         let allowed_ranges = matches!(time_range, TimeRangeModel::Day | TimeRangeModel::FiveDays);
-        
+
         if !allowed_ranges {
             return Err(Error::new(format!(
                 "The interval '{}' can only be used with ranges '1d' or '5d'. Please use one of these ranges or choose a different interval.",
@@ -1134,23 +1118,27 @@ fn parse_periods(periods_str: &str) -> Result<Vec<usize>, Error> {
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| {
-            s.parse::<usize>()
-                .map_err(|_| Error::new(format!("Invalid period value: '{}'. Periods must be positive integers.", s)))
+            s.parse::<usize>().map_err(|_| {
+                Error::new(format!(
+                    "Invalid period value: '{}'. Periods must be positive integers.",
+                    s
+                ))
+            })
         })
         .collect();
-    
+
     let periods = periods?;
-    
+
     for period in &periods {
         if *period == 0 {
             return Err(Error::new("Period must be greater than 0"));
         }
     }
-    
+
     if periods.is_empty() {
         return Err(Error::new("At least one period must be specified"));
     }
-    
+
     Ok(periods)
 }
 

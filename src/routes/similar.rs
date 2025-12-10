@@ -1,6 +1,6 @@
-use actix_web::{web, HttpResponse, Result};
 use crate::error::IntoWebResult;
 use crate::service;
+use actix_web::{HttpResponse, Result, web};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -21,13 +21,13 @@ pub async fn get_similar_quotes_handler(
     // Validate limit (1-20, matching Python implementation)
     let limit = query.limit.clamp(1, 20);
     let symbol = query.symbol.trim().to_uppercase();
-    
+
     if symbol.is_empty() {
         return Ok(HttpResponse::BadRequest().json(serde_json::json!({
             "detail": "Symbol parameter is required"
         })));
     }
-    
+
     let quotes = service::get_similar_quotes(
         &app_state.yahoo_client,
         &app_state.fetch_client,
@@ -45,4 +45,3 @@ pub async fn get_similar_quotes_handler(
 
     Ok(HttpResponse::Ok().json(quotes))
 }
-

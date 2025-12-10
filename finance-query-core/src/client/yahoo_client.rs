@@ -32,6 +32,11 @@ impl YahooFinanceClient {
         }
     }
 
+    /// Expose the underlying fetch client for auxiliary HTTP calls (e.g., logo fetching).
+    pub fn fetch_client(&self) -> Arc<FetchClient> {
+        Arc::clone(&self.fetch_client)
+    }
+
     async fn yahoo_request(
         &self,
         url: &str,

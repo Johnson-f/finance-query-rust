@@ -6,11 +6,11 @@
 
 use crate::client::error::YahooError;
 use crate::client::YahooFinanceClient;
-use crate::models::SimpleQuote;
+use crate::models::{LogoFetcher, SimpleQuote};
 use crate::websocket::QuotesUpdate;
 use async_stream::stream;
 use chrono::Utc;
-use futures_util::Stream;
+use futures_util::{future::join_all, Stream};
 use serde_json::Value;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -50,6 +50,7 @@ impl QuoteStream {
         symbols: Vec<String>,
         poll_interval: Duration,
     ) -> Pin<Box<dyn Stream<Item = Result<QuotesUpdate, YahooError>> + Send>> {
+        let logo_fetcher = Arc::new(LogoFetcher::new(client.fetch_client()));
         Box::pin(stream! {
             let mut ticker = interval(poll_interval);
 
@@ -61,7 +62,7 @@ impl QuoteStream {
 
                 match client.get_simple_quotes(&symbol_refs).await {
                     Ok(data) => {
-                        let quotes = parse_simple_quotes(&data);
+                        let quotes = parse_simple_quotes(&data, Some(logo_fetcher.clone())).await;
                         let update = QuotesUpdate::with_timestamp(quotes, Utc::now());
                         yield Ok(update);
                     }
@@ -93,6 +94,7 @@ impl SingleQuoteStream {
         symbol: String,
         poll_interval: Duration,
     ) -> Pin<Box<dyn Stream<Item = Result<SimpleQuote, YahooError>> + Send>> {
+        let logo_fetcher = Arc::new(LogoFetcher::new(client.fetch_client()));
         Box::pin(stream! {
             let mut ticker = interval(poll_interval);
 
@@ -102,7 +104,7 @@ impl SingleQuoteStream {
 
                 match client.get_simple_quotes(&[symbol.as_str()]).await {
                     Ok(data) => {
-                        let quotes = parse_simple_quotes(&data);
+                        let quotes = parse_simple_quotes(&data, Some(logo_fetcher.clone())).await;
                         if let Some(quote) = quotes.into_iter().next() {
                             yield Ok(quote);
                         }
@@ -229,42 +231,82 @@ fn get_name_field(result: &Value) -> String {
 }
 
 /// Parse simple quotes from Yahoo Finance API response.
-fn parse_simple_quotes(data: &Value) -> Vec<SimpleQuote> {
+async fn parse_simple_quotes(
+    data: &Value,
+    logo_fetcher: Option<Arc<LogoFetcher>>,
+) -> Vec<SimpleQuote> {
     let Some(results) = get_quote_results(data) else {
         return Vec::new();
     };
 
-    results
-        .iter()
-        .map(|result| SimpleQuote {
-            symbol: get_string_field(result, "symbol", ""),
-            name: get_name_field(result),
-            price: result
-                .get("regularMarketPrice")
-                .and_then(|p| p.as_f64())
-                .map(|p| format!("{:.2}", p))
-                .unwrap_or_else(|| "0.00".to_string()),
-            pre_market_price: result
-                .get("preMarketPrice")
-                .and_then(|p| p.as_f64())
-                .map(|p| format!("{:.2}", p)),
-            after_hours_price: result
-                .get("postMarketPrice")
-                .and_then(|p| p.as_f64())
-                .map(|p| format!("{:.2}", p)),
-            change: result
-                .get("regularMarketChange")
-                .and_then(|c| c.as_f64())
-                .map(|c| format!("{:+.2}", c))
-                .unwrap_or_else(|| "0.00".to_string()),
-            percent_change: result
-                .get("regularMarketChangePercent")
-                .and_then(|p| p.as_f64())
-                .map(|p| format!("{:+.2}%", p))
-                .unwrap_or_else(|| "0.00%".to_string()),
+    let mut quotes_with_meta = Vec::with_capacity(results.len());
+
+    for result in results {
+        let symbol = get_string_field(result, "symbol", "");
+        let name = get_name_field(result);
+        let price = result
+            .get("regularMarketPrice")
+            .and_then(|p| p.as_f64())
+            .map(|p| format!("{:.2}", p))
+            .unwrap_or_else(|| "0.00".to_string());
+
+        let pre_market_price = result
+            .get("preMarketPrice")
+            .and_then(|p| p.as_f64())
+            .map(|p| format!("{:.2}", p));
+
+        let after_hours_price = result
+            .get("postMarketPrice")
+            .and_then(|p| p.as_f64())
+            .map(|p| format!("{:.2}", p));
+
+        let change = result
+            .get("regularMarketChange")
+            .and_then(|c| c.as_f64())
+            .map(|c| format!("{:+.2}", c))
+            .unwrap_or_else(|| "0.00".to_string());
+
+        let percent_change = result
+            .get("regularMarketChangePercent")
+            .and_then(|p| p.as_f64())
+            .map(|p| format!("{:+.2}%", p))
+            .unwrap_or_else(|| "0.00%".to_string());
+
+        let website = result
+            .get("website")
+            .and_then(|w| w.as_str())
+            .map(|w| w.to_string());
+
+        let quote = SimpleQuote {
+            symbol,
+            name,
+            price,
+            pre_market_price,
+            after_hours_price,
+            change,
+            percent_change,
             logo: None,
-        })
-        .collect()
+        };
+
+        quotes_with_meta.push((quote, website));
+    }
+
+    if let Some(fetcher) = logo_fetcher {
+        let tasks = quotes_with_meta.into_iter().map(|(mut quote, website)| {
+            let fetcher = fetcher.clone();
+            async move {
+                quote.logo = fetcher.fetch_logo(&quote.symbol, website.as_deref()).await;
+                quote
+            }
+        });
+
+        join_all(tasks).await
+    } else {
+        quotes_with_meta
+            .into_iter()
+            .map(|(quote, _)| quote)
+            .collect()
+    }
 }
 
 /// A stream that yields market movers (actives, gainers, losers) at regular intervals.
@@ -403,8 +445,8 @@ fn parse_market_indices(data: &Value) -> Vec<crate::models::MarketIndex> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_parse_simple_quotes() {
+    #[tokio::test]
+    async fn test_parse_simple_quotes() {
         let data = serde_json::json!({
             "quoteResponse": {
                 "result": [
@@ -419,7 +461,7 @@ mod tests {
             }
         });
 
-        let quotes = parse_simple_quotes(&data);
+        let quotes = parse_simple_quotes(&data, None).await;
         assert_eq!(quotes.len(), 1);
         assert_eq!(quotes[0].symbol, "AAPL");
         assert_eq!(quotes[0].name, "Apple Inc.");

@@ -1,8 +1,8 @@
-use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
+use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use tracing::{error, info, warn};
 
 pub struct CacheService {
@@ -20,7 +20,7 @@ impl CacheService {
         };
 
         info!("Attempting to connect to Redis...");
-        
+
         match redis::Client::open(redis_url.as_str()) {
             Ok(client) => {
                 // Add a 10-second timeout for remote connections
@@ -32,7 +32,10 @@ impl CacheService {
                         }
                     }
                     Ok(Err(e)) => {
-                        warn!("✗ Failed to connect to Redis: {}. Caching will be disabled.", e);
+                        warn!(
+                            "✗ Failed to connect to Redis: {}. Caching will be disabled.",
+                            e
+                        );
                         warn!("  Check your network connection and Redis credentials");
                         Self { connection: None }
                     }
@@ -45,7 +48,10 @@ impl CacheService {
                 }
             }
             Err(e) => {
-                warn!("✗ Failed to create Redis client: {}. Caching will be disabled.", e);
+                warn!(
+                    "✗ Failed to create Redis client: {}. Caching will be disabled.",
+                    e
+                );
                 warn!("  Check your REDIS_URL format");
                 Self { connection: None }
             }
@@ -60,25 +66,26 @@ impl CacheService {
             // Clone the connection manager for this operation
             let mut conn = (**conn).clone();
             match conn.get::<_, String>(key).await {
-                Ok(value) => {
-                    match serde_json::from_str::<T>(&value) {
-                        Ok(deserialized) => {
-                            tracing::debug!("Cache hit for key: {}", key);
-                            Some(deserialized)
-                        }
-                        Err(e) => {
-                            error!("Failed to deserialize cached value for key {}: {}", key, e);
-                            None
-                        }
+                Ok(value) => match serde_json::from_str::<T>(&value) {
+                    Ok(deserialized) => {
+                        tracing::debug!("Cache hit for key: {}", key);
+                        Some(deserialized)
                     }
-                }
+                    Err(e) => {
+                        error!("Failed to deserialize cached value for key {}: {}", key, e);
+                        None
+                    }
+                },
                 Err(e) if e.kind() == redis::ErrorKind::TypeError => {
                     // Key doesn't exist - this is normal
                     tracing::debug!("Cache miss for key: {}", key);
                     None
                 }
                 Err(e) => {
-                    warn!("Redis error when getting key {}: {}. Bypassing cache.", key, e);
+                    warn!(
+                        "Redis error when getting key {}: {}. Bypassing cache.",
+                        key, e
+                    );
                     None
                 }
             }
@@ -99,7 +106,11 @@ impl CacheService {
                     if let Err(e) = conn.set_ex::<_, _, ()>(key, serialized, ttl_seconds).await {
                         warn!("Failed to set cache for key {}: {}", key, e);
                     } else {
-                        tracing::debug!("Cached value for key: {} with TTL: {} seconds", key, ttl_seconds);
+                        tracing::debug!(
+                            "Cached value for key: {} with TTL: {} seconds",
+                            key,
+                            ttl_seconds
+                        );
                     }
                 }
                 Err(e) => {
@@ -119,11 +130,20 @@ pub const TTL_ANALYSTS: u64 = 604_800; // 1 week
 
 // Cache key generation helpers
 pub fn earnings_transcript_key(symbol: &str, transcript_type: &str) -> String {
-    format!("earnings_transcript:{}:{}", symbol.to_uppercase(), transcript_type)
+    format!(
+        "earnings_transcript:{}:{}",
+        symbol.to_uppercase(),
+        transcript_type
+    )
 }
 
 pub fn financials_key(symbol: &str, statement: &str, frequency: &str) -> String {
-    format!("financials:{}:{}:{}", symbol.to_uppercase(), statement, frequency)
+    format!(
+        "financials:{}:{}:{}",
+        symbol.to_uppercase(),
+        statement,
+        frequency
+    )
 }
 
 pub fn holders_key(symbol: &str, holder_type: &str) -> String {

@@ -1,6 +1,6 @@
-use actix_web::{web, HttpResponse, Result};
 use crate::error::IntoWebResult;
 use crate::service;
+use actix_web::{HttpResponse, Result, web};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -18,14 +18,9 @@ pub async fn search_handler(
     query: web::Query<SearchQuery>,
     app_state: web::Data<crate::AppState>,
 ) -> Result<HttpResponse> {
-    let results = service::search(
-        &app_state.yahoo_client,
-        &query.q,
-        query.hits,
-    )
-    .await
-    .into_web_result()?;
+    let results = service::search(&app_state.yahoo_client, &query.q, query.hits)
+        .await
+        .into_web_result()?;
 
     Ok(HttpResponse::Ok().json(results))
 }
-

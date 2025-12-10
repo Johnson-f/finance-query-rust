@@ -132,11 +132,11 @@ pub const CASH_FLOW_FIELDS: &[&str] = &[
 ];
 
 /// Get the list of fields for a given statement type and frequency.
-/// 
+///
 /// # Arguments
 /// * `statement_type` - One of "income", "balance", "cashflow"
 /// * `frequency` - One of "annual", "quarterly"
-/// 
+///
 /// # Returns
 /// Vector of field names with frequency prefix (e.g., "annualTotalRevenue")
 pub fn get_statement_fields(statement_type: &str, frequency: &str) -> Vec<String> {
@@ -144,7 +144,10 @@ pub fn get_statement_fields(statement_type: &str, frequency: &str) -> Vec<String
         "income" => INCOME_STATEMENT_FIELDS,
         "balance" => BALANCE_SHEET_FIELDS,
         "cashflow" => CASH_FLOW_FIELDS,
-        _ => panic!("Invalid statement type: {}. Must be one of income, balance, cashflow", statement_type),
+        _ => panic!(
+            "Invalid statement type: {}. Must be one of income, balance, cashflow",
+            statement_type
+        ),
     };
 
     fields
