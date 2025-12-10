@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::timeout;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Simple circuit breaker to protect the external logo service.
 #[derive(Debug)]
