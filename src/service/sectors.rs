@@ -23,7 +23,7 @@ pub async fn get_sectors(fetch_client: &Arc<FetchClient>) -> Result<Vec<MarketSe
             response_text.len()
         )));
     }
-
+    
     debug!(
         "Response from {} (length: {} bytes, preview: {})",
         url,
